@@ -2,12 +2,20 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, RotateCcw, Calendar, ArrowLeft, Paperclip, ChevronRight } from 'lucide-react';
+import { 
+  Search, RotateCcw, Calendar, ArrowLeft, Paperclip, 
+  ExternalLink, Building2, Clock, Sparkles, Filter, ChevronDown, ChevronUp, Download
+} from 'lucide-react';
 
-const DEPARTMENTS = [
+const MAJOR_DEPTS = [
+  '전체', '다부처', '과학기술정보통신부', '산업통상부', '중소벤처기업부', 
+  '기후에너지환경부', '보건복지부', '교육부', '국토교통부', '행정안전부'
+];
+
+const ALL_DEPTS = [
   '개인정보보호위원회', '경찰청', '고용노동부', '고준위방사성폐기물관리위원회', '공정거래위원회', '과학기술정보통신부', '교육부', '국가데이터처',
   '국가보훈부', '국가유산청', '국무조정실', '국방부', '국토교통부', '국회', '기상청', '기획예산처', '기획재정부', '기후에너지환경부',
-  '농림축산식품부', '농촌진흥청', '대통령경호처', '대통령비서실', '문화재청', '문화체육관광부', '방송미디어통신위원회', '방위사업청', '법무부', '법제처',
+  '농림축산식품부', '농촌진흥청', '대통령경호처', '대통령비서실', '문화체육관광부', '방송미디어통신위원회', '방위사업청', '법무부', '법제처',
   '보건복지부', '산림청', '산업통상부', '성평등가족부', '소방청', '식품의약품안전처', '외교부', '우주항공청', '원자력안전위원회', '재정경제부',
   '중소벤처기업부', '지식재산처', '질병관리청', '통일부', '해양경찰청', '해양수산부', '행정안전부', '다부처', '기타'
 ];
@@ -34,22 +42,16 @@ interface NoticeDetail {
 }
 
 export default function Home() {
-  const [noticeType, setNoticeType] = useState('전체');
   const [noticeStatus, setNoticeStatus] = useState('전체');
   const [selectedDept, setSelectedDept] = useState('전체');
   const [keyword, setKeyword] = useState('');
+  const [showAllDepts, setShowAllDepts] = useState(false);
   
   const [notices, setNotices] = useState<NoticeDetail[]>([]);
   const [totalCount, setTotalCount] = useState<number>(77106);
   const [loading, setLoading] = useState(false);
-
-  // 상세 페이지 조회를 위한 State
   const [selectedNotice, setSelectedNotice] = useState<NoticeDetail | null>(null);
 
-  const [allChecked, setAllChecked] = useState(false);
-  const [checkedItems, setCheckedItems] = useState<(string | number)[]>([]);
-
-  // API 데이터 호출
   const loadNotices = useCallback(async (kw = keyword, dept = selectedDept) => {
     setLoading(true);
     try {
@@ -79,7 +81,6 @@ export default function Home() {
   };
 
   const handleReset = () => {
-    setNoticeType('전체');
     setNoticeStatus('전체');
     setSelectedDept('전체');
     setKeyword('');
@@ -93,21 +94,6 @@ export default function Home() {
     loadNotices(keyword, selectedDept);
   };
 
-  const handleCheckAll = () => {
-    if (allChecked) {
-      setCheckedItems([]);
-    } else {
-      setCheckedItems(filteredList.map(n => n.id));
-    }
-    setAllChecked(!allChecked);
-  };
-
-  const handleItemCheck = (id: string | number) => {
-    setCheckedItems(prev =>
-      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
-    );
-  };
-
   const filteredList = useMemo(() => {
     return notices.filter(n => {
       if (noticeStatus === '전체') return true;
@@ -119,313 +105,310 @@ export default function Home() {
   }, [notices, noticeStatus]);
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] text-[#333] font-sans pb-20">
-      {/* 1. 최상단 타이틀 */}
-      <div className="max-w-[1240px] mx-auto pt-6 pb-2 px-4 flex items-center justify-between">
-        <h1 
-          className="text-2xl font-black text-black tracking-tight cursor-pointer"
-          onClick={() => setSelectedNotice(null)}
-        >
-          국가R&D통합공고
-        </h1>
-        {selectedNotice && (
-          <button
+    <div className="min-h-screen bg-[#f8fafc] text-slate-800 antialiased pb-24">
+      {/* 상단 네비게이션 헤더 */}
+      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+          <div 
             onClick={() => setSelectedNotice(null)}
-            className="flex items-center gap-1 text-sm bg-white border border-gray-300 px-3 py-1.5 rounded hover:bg-gray-50 text-gray-700 font-medium"
+            className="flex items-center gap-2.5 cursor-pointer group"
           >
-            <ArrowLeft className="w-4 h-4" /> 목록으로 돌아가기
-          </button>
-        )}
-      </div>
-
-      <main className="max-w-[1240px] mx-auto px-4 space-y-4">
-        {/* 공고 상세 페이지 화면 (두 번째 첨부파일 레이아웃 100% 재현) */}
-        {selectedNotice ? (
-          <div className="bg-white border border-[#d8dce2] rounded-none p-8 space-y-6 shadow-sm">
-            {/* 타이틀 및 밑줄 */}
-            <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">{selectedNotice.title}</h2>
-              <div className="border-b-2 border-black"></div>
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white font-bold shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
+              N
             </div>
+            <div>
+              <span className="font-extrabold text-lg text-slate-900 tracking-tight">국가R&D 통합공고</span>
+              <span className="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100">
+                NTIS LIVE
+              </span>
+            </div>
+          </div>
 
-            {/* 기본 상세 정보 테이블 영역 */}
-            <div className="space-y-2 text-[13px]">
-              <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                <div className="flex gap-12">
-                  <span><strong className="font-semibold text-gray-700">공고형태 :</strong> {selectedNotice.noticeType}</span>
-                  <span><strong className="font-semibold text-gray-700">부처명 :</strong> {selectedNotice.dept}</span>
-                  <span><strong className="font-semibold text-gray-700">공고기관명 :</strong> {selectedNotice.agency}</span>
-                </div>
+          {selectedNotice && (
+            <button
+              onClick={() => setSelectedNotice(null)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition"
+            >
+              <ArrowLeft className="w-4 h-4" /> 목록으로
+            </button>
+          )}
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-8 space-y-6">
+        {selectedNotice ? (
+          /* =================== 모던 상세 화면 =================== */
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <button
+              onClick={() => setSelectedNotice(null)}
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-blue-600 transition"
+            >
+              <ArrowLeft className="w-4 h-4" /> 전체 공고 목록으로 돌아가기
+            </button>
+
+            {/* 카드 헤더 */}
+            <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200/80 shadow-sm space-y-6">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200/60">
+                  {selectedNotice.dept}
+                </span>
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700">
+                  {selectedNotice.noticeType}
+                </span>
+                <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                  selectedNotice.status === '접수중' 
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                    : 'bg-amber-50 text-amber-700 border border-amber-200'
+                }`}>
+                  {selectedNotice.status}
+                </span>
+                <span className="ml-auto font-black text-rose-600 text-sm bg-rose-50 px-3 py-1 rounded-full border border-rose-100">
+                  {selectedNotice.dday}
+                </span>
+              </div>
+
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pt-2">
+                <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 leading-snug">
+                  {selectedNotice.title}
+                </h2>
                 <a
                   href={selectedNotice.irisUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="bg-[#0070d2] text-white px-5 py-2 font-bold text-xs rounded-full flex items-center gap-1 hover:bg-[#005bb5] transition shadow-sm"
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-sm shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/30 transition whitespace-nowrap"
                 >
-                  IRIS 바로가기 ▶
+                  IRIS 공고 신청 바로가기 <ExternalLink className="w-4 h-4" />
                 </a>
               </div>
 
-              <div className="bg-[#f5f6f8] p-3 flex gap-12 text-gray-700 rounded-none">
-                <span><strong className="font-semibold">공고일 :</strong> {selectedNotice.noticeDate}</span>
-                <span><strong className="font-semibold">접수일 :</strong> {selectedNotice.rcptBg}</span>
-                <span><strong className="font-semibold">마감일 :</strong> {selectedNotice.rcptEnd}</span>
-                <span><strong className="font-semibold">접수마감시간 :</strong> {selectedNotice.rcptEndTime}</span>
-              </div>
-
-              <div className="flex gap-12 py-2 text-gray-700">
-                <span><strong className="font-semibold">공고유형 :</strong> {selectedNotice.noticeCategory}</span>
-                <span><strong className="font-semibold">공고금액 :</strong> {selectedNotice.budget}</span>
-              </div>
-
-              <div className="bg-[#f5f6f8] p-3 text-gray-700">
-                <span><strong className="font-semibold">문의처 :</strong> {selectedNotice.contact}</span>
-              </div>
-
-              <div className="py-2 text-gray-700">
-                <span><strong className="font-semibold">사업명 :</strong> {selectedNotice.projectName}</span>
-              </div>
-            </div>
-
-            {/* 첨부파일 박스 */}
-            <div className="border border-gray-300 rounded p-4 text-[13px] bg-white flex gap-4">
-              <span className="font-bold text-gray-700 whitespace-nowrap pt-0.5">첨부파일</span>
-              <div className="space-y-1.5 flex-1">
-                {selectedNotice.files.map((file, idx) => (
-                  <div key={idx} className="flex items-center gap-1.5 text-gray-700 hover:text-blue-600 cursor-pointer">
-                    <Paperclip className="w-3.5 h-3.5 text-gray-500" />
-                    <span className="hover:underline">{file}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* 공고 내용 및 링크 안내 */}
-            <div className="pt-4 space-y-4 text-[13px]">
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-gray-900 text-base">공고내용</h3>
-                <span className="text-red-500 text-xs">※ 자세한 내용은 <a href={selectedNotice.irisUrl} target="_blank" rel="noreferrer" className="underline font-bold text-blue-600">IRIS 사업공고</a>에서 확인하시기 바랍니다.</span>
-              </div>
-              <div className="p-4 bg-gray-50 border border-gray-200 min-h-[120px] text-gray-600 leading-relaxed">
-                {selectedNotice.content}
-              </div>
-            </div>
-          </div>
-        ) : (
-          /* 기존 메인 목록 화면 */
-          <>
-            {/* 조건 선택 박스 (격자형) */}
-            <div className="border border-[#c7cdd5] bg-white text-[12px] shadow-sm">
-              {/* 공고형태 */}
-              <div className="grid grid-cols-[120px_1fr] border-b border-[#e1e4e8]">
-                <div className="bg-[#f0f2f5] font-bold text-gray-700 flex items-center justify-between px-4 border-r border-[#e1e4e8]">
-                  <span>공고형태</span>
-                  <span className="text-[10px] text-gray-400">▶</span>
+              {/* 핵심 요약 그리드 */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-5 rounded-xl bg-slate-50 border border-slate-100 text-sm">
+                <div>
+                  <span className="block text-xs font-medium text-slate-400 mb-1">공고기관</span>
+                  <span className="font-semibold text-slate-800">{selectedNotice.agency}</span>
                 </div>
-                <div className="grid grid-cols-4 divide-x divide-[#e1e4e8] text-center">
-                  {['전체', '통합공고', '개별공고', '도움말'].map(type => (
-                    <button
-                      key={type}
-                      onClick={() => setNoticeType(type)}
-                      className={`py-2 ${noticeType === type ? 'bg-[#ff6000] text-white font-bold' : 'hover:bg-gray-50'}`}
+                <div>
+                  <span className="block text-xs font-medium text-slate-400 mb-1">지원 규모</span>
+                  <span className="font-bold text-blue-600">{selectedNotice.budget}</span>
+                </div>
+                <div>
+                  <span className="block text-xs font-medium text-slate-400 mb-1">접수 기간</span>
+                  <span className="font-medium text-slate-800">{selectedNotice.rcptBg} ~ {selectedNotice.rcptEnd}</span>
+                </div>
+                <div>
+                  <span className="block text-xs font-medium text-slate-400 mb-1">접수 마감 시간</span>
+                  <span className="font-medium text-slate-800">{selectedNotice.rcptEndTime}</span>
+                </div>
+              </div>
+
+              {/* 문의 및 세부 안내 */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-slate-600 pt-2 border-t border-slate-100">
+                <div><strong className="text-slate-900 font-semibold">사업명:</strong> {selectedNotice.projectName}</div>
+                <div><strong className="text-slate-900 font-semibold">문의처:</strong> {selectedNotice.contact}</div>
+              </div>
+
+              {/* 첨부파일 다운로드 카드 */}
+              <div className="space-y-3 pt-4 border-t border-slate-100">
+                <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                  <Paperclip className="w-4 h-4 text-slate-500" />
+                  <span>첨부파일 ({selectedNotice.files.length})</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                  {selectedNotice.files.map((file, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/50 hover:bg-white hover:border-blue-400 hover:shadow-sm transition cursor-pointer group"
                     >
-                      {type}
-                    </button>
+                      <span className="text-xs font-medium text-slate-700 truncate pr-2 group-hover:text-blue-600">
+                        {file}
+                      </span>
+                      <Download className="w-4 h-4 text-slate-400 group-hover:text-blue-600 flex-shrink-0" />
+                    </div>
                   ))}
                 </div>
               </div>
 
-              {/* 공고현황 */}
-              <div className="grid grid-cols-[120px_1fr] border-b border-[#e1e4e8]">
-                <div className="bg-[#f0f2f5] font-bold text-gray-700 flex items-center justify-between px-4 border-r border-[#e1e4e8]">
-                  <span>공고현황</span>
-                  <span className="text-[10px] text-gray-400">▶</span>
+              {/* 공고 본문 */}
+              <div className="space-y-2 pt-4 border-t border-slate-100">
+                <h3 className="text-sm font-bold text-slate-900">공고 내용</h3>
+                <div className="p-6 rounded-xl bg-slate-50/70 border border-slate-100 text-sm text-slate-600 leading-relaxed min-h-[140px]">
+                  {selectedNotice.content}
                 </div>
-                <div className="grid grid-cols-4 divide-x divide-[#e1e4e8] text-center">
-                  {['전체', '접수예정', '접수중', '마감'].map(st => (
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* =================== 모던 메인 목록 =================== */
+          <>
+            {/* 상단 검색 & 필터 카드 */}
+            <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.03)] space-y-6">
+              {/* 1. 키워드 검색창 */}
+              <form onSubmit={handleSearch} className="relative flex items-center">
+                <Search className="absolute left-4 w-5 h-5 text-slate-400" />
+                <input
+                  type="text"
+                  value={keyword}
+                  onChange={(e) => setKeyword(e.target.value)}
+                  placeholder="사업명, 키워드(예: 인공지능, 이차전지, 바이오, 친환경)로 실시간 과제를 찾아보세요"
+                  className="w-full pl-12 pr-28 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition outline-none"
+                />
+                <button
+                  type="submit"
+                  className="absolute right-2 px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow-sm"
+                >
+                  검색
+                </button>
+              </form>
+
+              {/* 2. 공고 상태 탭 뱃지 */}
+              <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
+                <div className="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-xl">
+                  {['전체', '접수중', '접수예정', '마감'].map((st) => (
                     <button
                       key={st}
                       onClick={() => setNoticeStatus(st)}
-                      className={`py-2 ${noticeStatus === st ? 'bg-[#ff6000] text-white font-bold' : 'hover:bg-gray-50'}`}
+                      className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        noticeStatus === st
+                          ? 'bg-white text-blue-600 shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
                     >
                       {st}
                     </button>
                   ))}
                 </div>
-              </div>
-
-              {/* 부처명 그리드 */}
-              <div className="grid grid-cols-[120px_1fr]">
-                <div className="bg-[#f0f2f5] font-bold text-gray-700 flex items-center justify-between px-4 border-r border-[#e1e4e8]">
-                  <span>부처명</span>
-                  <span className="text-[10px] text-gray-400">▶</span>
-                </div>
-                <div className="p-0">
-                  <div className="grid grid-cols-8 divide-x divide-y divide-[#e1e4e8] text-center border-b border-[#e1e4e8]">
-                    <button
-                      onClick={() => handleDeptSelect('전체')}
-                      className={`py-2 font-bold ${selectedDept === '전체' ? 'bg-[#ff6000] text-white' : 'hover:bg-gray-50'}`}
-                    >
-                      전체
-                    </button>
-                    {DEPARTMENTS.slice(0, 46).map((dept) => (
-                      <button
-                        key={dept}
-                        onClick={() => handleDeptSelect(dept)}
-                        title={dept}
-                        className={`py-2 px-1 truncate transition-colors ${
-                          selectedDept === dept ? 'bg-[#ff6000] text-white font-bold' : 'hover:bg-gray-50'
-                        }`}
-                      >
-                        {dept}
-                      </button>
-                    ))}
-                    <button
-                      onClick={handleReset}
-                      className="py-2 flex items-center justify-center gap-1 text-[#0070d2] font-bold hover:bg-gray-50"
-                    >
-                      <RotateCcw className="w-3 h-3 text-[#0070d2]" /> 설정초기화
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 안내 문구 */}
-            <div className="space-y-1 text-[12px] text-gray-600">
-              <div className="flex items-start gap-1.5">
-                <span className="bg-gray-300 text-white font-bold px-1 rounded-sm text-[10px]">!</span>
-                <p>2018년 이전 국가R&D통합공고는 접수일, 접수마감시간, 공고형태, 공고유형, 공고규모, 문의처, 사업명 정보가 제공되지 않습니다</p>
-              </div>
-              <div className="flex items-start gap-1.5">
-                <span className="bg-gray-300 text-white font-bold px-1 rounded-sm text-[10px]">!</span>
-                <p>본 통합공고는 관련된 기관에서 자동수집 방식으로 수집되어, <span className="font-bold text-gray-800">R&D사업과 비R&D사업 공고가 포함됩니다.</span> 자세한 공고 정보는 해당 공고의 첨부파일 등을 통해 확인하시기 바랍니다</p>
-              </div>
-            </div>
-
-            {/* 검색 상세 바 */}
-            <form onSubmit={handleSearch} className="border border-[#c7cdd5] bg-[#fbfcfd] p-4 text-[12px] space-y-3 shadow-sm">
-              <div className="flex items-center gap-4">
-                <span className="w-16 font-bold text-gray-700">키워드</span>
-                <div className="flex-1 flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={keyword}
-                    onChange={(e) => setKeyword(e.target.value)}
-                    placeholder="국가R&D통합공고 키워드 검색"
-                    className="w-full max-w-xl px-3 py-1.5 border border-gray-300 bg-white focus:outline-none focus:border-blue-500"
-                  />
-                  <label className="flex items-center gap-1 cursor-pointer text-gray-600">
-                    <input type="checkbox" /> 공고기관 검색
-                  </label>
-                  <label className="flex items-center gap-1 cursor-pointer text-gray-600">
-                    <input type="checkbox" /> 첨부파일명 검색
-                  </label>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-4">
-                <span className="w-16 font-bold text-gray-700">공고일</span>
-                <div className="flex items-center gap-1">
-                  <input type="text" className="w-24 px-2 py-1.5 border border-gray-300 bg-white" />
-                  <button type="button" className="p-1.5 border border-gray-300 bg-gray-100 text-gray-600"><Calendar className="w-3.5 h-3.5" /></button>
-                  <span>~</span>
-                  <input type="text" className="w-24 px-2 py-1.5 border border-gray-300 bg-white" />
-                  <button type="button" className="p-1.5 border border-gray-300 bg-gray-100 text-gray-600"><Calendar className="w-3.5 h-3.5" /></button>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-gray-700 ml-2">공고유형</span>
-                  <select className="px-3 py-1.5 border border-gray-300 bg-white">
-                    <option>전체</option>
-                  </select>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-gray-700">공고규모</span>
-                  <select className="px-3 py-1.5 border border-gray-300 bg-white">
-                    <option>전체</option>
-                  </select>
-                </div>
 
                 <button
-                  type="submit"
-                  className="ml-auto px-8 py-1.5 bg-[#0070d2] text-white font-bold hover:bg-[#005bb5] transition-colors"
+                  onClick={handleReset}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800 transition"
                 >
-                  검색
+                  <RotateCcw className="w-3.5 h-3.5" /> 조건 초기화
                 </button>
               </div>
-            </form>
 
-            {/* 검색결과 카운트 (중간 네모 3개 버튼 완전 삭제 완료) */}
-            <div className="flex items-center justify-between pt-2">
-              <div className="text-base font-bold">
-                검색결과 <span className="text-[#0070d2]">{totalCount.toLocaleString()}</span>건
+              {/* 3. 소관 부처 필터 칩 */}
+              <div className="space-y-2.5 pt-1">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-500">
+                  <div className="flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5" />
+                    <span>소관 부처별 모아보기</span>
+                  </div>
+                  <button
+                    onClick={() => setShowAllDepts(!showAllDepts)}
+                    className="inline-flex items-center gap-1 text-blue-600 hover:underline"
+                  >
+                    {showAllDepts ? '주요 부처만 보기' : '전체 부처 펼치기'} 
+                    {showAllDepts ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {(showAllDepts ? ALL_DEPTS : MAJOR_DEPTS).map((dept) => (
+                    <button
+                      key={dept}
+                      onClick={() => handleDeptSelect(dept)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                        selectedDept === dept
+                          ? 'bg-slate-900 text-white shadow-sm'
+                          : 'bg-slate-100 hover:bg-slate-200/70 text-slate-600'
+                      }`}
+                    >
+                      {dept}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
-            {/* 공고 테이블 */}
-            <div className="border-t-2 border-black border-b border-[#c7cdd5] bg-white overflow-x-auto text-[12px]">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-[#f9fafb] border-b border-gray-200 text-gray-600 text-center font-bold">
-                    <th className="py-3 px-3 w-10 border-r border-gray-200">
-                      <input type="checkbox" checked={allChecked} onChange={handleCheckAll} />
-                    </th>
-                    <th className="py-3 px-3 w-16 border-r border-gray-200">순번</th>
-                    <th className="py-3 px-4 w-24 border-r border-gray-200">현황</th>
-                    <th className="py-3 px-4 text-center border-r border-gray-200">공고명</th>
-                    <th className="py-3 px-4 w-36 border-r border-gray-200">부처명</th>
-                    <th className="py-3 px-3 w-28 border-r border-gray-200">접수일 ⬇</th>
-                    <th className="py-3 px-3 w-28 border-r border-gray-200">마감일 ⬇</th>
-                    <th className="py-3 px-3 w-20">D-day</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 text-center">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={8} className="py-16 text-gray-400">
-                        공고 정보를 불러오는 중입니다...
-                      </td>
+            {/* 결과 건수 */}
+            <div className="flex items-center justify-between px-1">
+              <span className="text-sm font-semibold text-slate-600">
+                총 <strong className="text-slate-900 font-extrabold">{totalCount.toLocaleString()}</strong>건의 과제 공고
+              </span>
+            </div>
+
+            {/* 메인 리스트 테이블 (모던 카드형 테이블) */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)] overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50/80 border-b border-slate-200/80 text-slate-500 font-bold">
+                      <th className="py-3.5 px-5 w-24 text-center">상태</th>
+                      <th className="py-3.5 px-4">공고명</th>
+                      <th className="py-3.5 px-4 w-40 text-center">소관 부처</th>
+                      <th className="py-3.5 px-4 w-32 text-center">접수 기간</th>
+                      <th className="py-3.5 px-4 w-24 text-center">남은 기간</th>
                     </tr>
-                  ) : filteredList.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="py-16 text-gray-400">
-                        조회된 공고 내역이 없습니다.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredList.map((notice) => (
-                      <tr key={notice.id} className="hover:bg-blue-50/20">
-                        <td className="py-3 px-3 border-r border-gray-200">
-                          <input
-                            type="checkbox"
-                            checked={checkedItems.includes(notice.id)}
-                            onChange={() => handleItemCheck(notice.id)}
-                          />
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {loading ? (
+                      <tr>
+                        <td colSpan={5} className="py-20 text-center text-slate-400 font-medium">
+                          과제 정보를 불러오는 중입니다...
                         </td>
-                        <td className="py-3 px-3 text-gray-600 border-r border-gray-200">{notice.id}</td>
-                        <td className="py-3 px-4 border-r border-gray-200 font-bold">
-                          <span className={notice.status === '접수중' ? 'text-red-500' : notice.status === '마감' ? 'text-gray-400' : 'text-[#0070d2]'}>
-                            {notice.status}
-                          </span>
-                        </td>
-                        {/* 공고명 클릭 시 상세 페이지로 전환 */}
-                        <td 
-                          className="py-3 px-4 text-left font-medium text-gray-800 border-r border-gray-200 hover:text-blue-600 hover:underline cursor-pointer"
-                          onClick={() => setSelectedNotice(notice)}
-                        >
-                          {notice.title}
-                        </td>
-                        <td className="py-3 px-4 text-gray-600 border-r border-gray-200">{notice.dept}</td>
-                        <td className="py-3 px-3 text-gray-500 border-r border-gray-200">{notice.rcptBg}</td>
-                        <td className="py-3 px-3 text-gray-500 border-r border-gray-200">{notice.rcptEnd}</td>
-                        <td className="py-3 px-3 font-semibold text-gray-700">{notice.dday}</td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : filteredList.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-20 text-center text-slate-400 font-medium">
+                          조건에 부합하는 공고가 없습니다.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredList.map((notice) => (
+                        <tr 
+                          key={notice.id}
+                          onClick={() => setSelectedNotice(notice)}
+                          className="hover:bg-blue-50/40 cursor-pointer transition-colors group"
+                        >
+                          {/* 상태 태그 */}
+                          <td className="py-4 px-5 text-center">
+                            <span className={`inline-block px-2.5 py-1 rounded-md font-bold text-[11px] ${
+                              notice.status === '접수중'
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/80'
+                                : notice.status === '접수예정'
+                                ? 'bg-blue-50 text-blue-700 border border-blue-200/80'
+                                : 'bg-slate-100 text-slate-400'
+                            }`}>
+                              {notice.status}
+                            </span>
+                          </td>
+
+                          {/* 공고명 */}
+                          <td className="py-4 px-4 font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm line-clamp-1">{notice.title}</span>
+                              <ExternalLink className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 text-blue-500 transition-opacity flex-shrink-0" />
+                            </div>
+                          </td>
+
+                          {/* 부처 */}
+                          <td className="py-4 px-4 text-center">
+                            <span className="inline-block px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-medium text-[11px]">
+                              {notice.dept}
+                            </span>
+                          </td>
+
+                          {/* 접수 기간 */}
+                          <td className="py-4 px-4 text-center text-slate-500 font-medium whitespace-nowrap">
+                            {notice.rcptBg} ~ {notice.rcptEnd}
+                          </td>
+
+                          {/* D-day */}
+                          <td className="py-4 px-4 text-center">
+                            <span className={`font-black text-xs px-2 py-0.5 rounded-full ${
+                              notice.dday === '마감'
+                                ? 'text-slate-400 bg-slate-100'
+                                : 'text-rose-600 bg-rose-50 border border-rose-100'
+                            }`}>
+                              {notice.dday}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </>
         )}
