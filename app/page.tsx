@@ -5,23 +5,24 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Search, RotateCcw, ArrowLeft, Paperclip, 
   ExternalLink, Building2, ChevronDown, ChevronUp, 
-  Download, Share2, Check, ArrowUpRight
+  Download, Share2, Check, ArrowUpRight, FileSpreadsheet, ArrowUpDown
 } from 'lucide-react';
 
-// 5대 핵심 부처
+// 주요 5대 부처 (NTIS mng.do 대표 기준)
 const KEY_DEPTS = [
   '전체', '다부처', '중소벤처기업부', '과학기술정보통신부', '산업통상자원부', '국토교통부', '행정안전부'
 ];
 
+// 전체 부처 목록
 const ALL_DEPTS = [
   '전체', '다부처', '중소벤처기업부', '과학기술정보통신부', '산업통상자원부', '국토교통부', '행정안전부',
-  '보건복지부', '기후에너지환경부', '교육부', '농림축산식품부', '해양수산부', '방위사업청', 
+  '기후에너지환경부', '보건복지부', '교육부', '농림축산식품부', '해양수산부', '방위사업청', 
   '소방청', '식품의약품안전처', '기상청', '농촌진흥청', '산림청', '질병관리청', '특허청', '기타'
 ];
 
 interface NoticeDetail {
   id: number | string;
-  status: string;
+  status: '접수중' | '접수예정' | '마감';
   title: string;
   dept: string;
   rcptBg: string;
@@ -40,9 +41,9 @@ interface NoticeDetail {
   content: string;
 }
 
-// 부처별 매칭을 위한 표준 데이터베이스 (중기부, 과기부, 산업부, 국토부, 행안부 등)
+// NTIS mng.do 표준 데이터베이스
 const INITIAL_DATABASE: NoticeDetail[] = [
-  // 1. 국토교통부 공고
+  // 1. 국토교통부
   {
     id: 77120,
     status: '접수중',
@@ -84,7 +85,7 @@ const INITIAL_DATABASE: NoticeDetail[] = [
     content: '디지털 트윈 기반 도로 교량 안전진단 및 스마트 인프라 기술 수요를 수렴합니다.'
   },
 
-  // 2. 중소벤처기업부 공고
+  // 2. 중소벤처기업부
   {
     id: 77118,
     status: '접수중',
@@ -103,7 +104,7 @@ const INITIAL_DATABASE: NoticeDetail[] = [
     contact: '1357',
     projectName: '중소기업 기술혁신 개발사업',
     files: ['1. 2026년도 수출지향형 공고문.pdf', '2. 과제신청서식.zip'],
-    content: '글로벌 진출 역량을 보유한 중소벤처기업의 첨단 기술개발을 집중 지원합니다.'
+    content: '글로벌 진출 역량을 보유한 유망 중소벤처기업의 첨단 기술개발을 집중 지원합니다.'
   },
   {
     id: 77117,
@@ -121,12 +122,12 @@ const INITIAL_DATABASE: NoticeDetail[] = [
     noticeCategory: '본공고',
     budget: '1.2 억원',
     contact: '1357',
-    projectName: '창업성장기술개발사업(창업 7년 이내)',
+    projectName: '창업성장기술개발사업',
     files: ['1. 디딤돌 3차 사업공고.pdf'],
-    content: '초기 창업기업의 첫 R&D 도전 및 시장 안착을 지원하기 위한 과제 공모입니다.'
+    content: '창업 7년 이내 초기 창업기업의 첫 R&D 도전 및 시장 안착을 지원합니다.'
   },
 
-  // 3. 과학기술정보통신부 공고
+  // 3. 과학기술정보통신부
   {
     id: 77115,
     status: '접수중',
@@ -145,10 +146,10 @@ const INITIAL_DATABASE: NoticeDetail[] = [
     contact: '042-869-6114',
     projectName: '인공지능 핵심원천기술개발사업',
     files: ['1. 공고지침서 및 RFP.pdf', '2. 연구개발계획서 양식.hwp'],
-    content: '차세대 고신뢰성 거대인공지능 원천 알고리즘 개발 및 GPU 가속 연구를 지원합니다.'
+    content: '차세대 고신뢰성 거대 인공지능 원천 기술 및 차세대 가속 컴퓨팅 인프라 연구 과제입니다.'
   },
 
-  // 4. 산업통상자원부 공고
+  // 4. 산업통상자원부
   {
     id: 77105,
     status: '접수중',
@@ -163,34 +164,34 @@ const INITIAL_DATABASE: NoticeDetail[] = [
     noticeDate: '2026.09.03',
     rcptEndTime: '18:00',
     noticeCategory: '수요조사',
-    budget: '협의 후 결정',
+    budget: '과제별 협의',
     contact: '053-718-8200',
     projectName: '스마트전자 분야 중전기기 기술개발사업',
     files: ['1. 기술수요조사 공고문.hwp'],
-    content: '스마트 변전소 및 분산 전원망 연계 고효율 중전기기 기술개발 수요조사'
+    content: '스마트 변전소 및 전력망 연계 고효율 중전기기 기술 수요를 파악하여 향후 R&D에 반영합니다.'
   },
   {
     id: 77102,
-    status: '접수중',
+    status: '마감',
     title: '2027년도 자원분야 RD사업 통합기술수요조사 공고',
     dept: '산업통상자원부',
-    rcptBg: '2026.09.04',
-    rcptEnd: '2026.09.14',
-    dday: 'D -7',
+    rcptBg: '2026.08.04',
+    rcptEnd: '2026.09.04',
+    dday: '마감',
     noticeType: '개별공고',
     agency: '한국에너지기술평가원',
     irisUrl: 'https://www.iris.go.kr',
-    noticeDate: '2026.09.04',
+    noticeDate: '2026.08.04',
     rcptEndTime: '18:00',
     noticeCategory: '수요조사',
     budget: '과제별 상이',
     contact: '02-3469-8400',
     projectName: '자원개발 및 공급망 안정화 R&D',
     files: ['1. 자원분야 기술수요조사 공고문.hwp'],
-    content: '핵심 광물 정제련 및 자원 순환 공정 기술수요조사'
+    content: '핵심 광물 정제련 및 자원 안보 확보를 위한 통합 기술수요조사'
   },
 
-  // 5. 행정안전부 공고
+  // 5. 행정안전부
   {
     id: 77104,
     status: '접수중',
@@ -212,7 +213,7 @@ const INITIAL_DATABASE: NoticeDetail[] = [
     content: '영구기록물 보존 및 AI 기반 기록물 자동 분류 색인 기술'
   },
 
-  // 6. 다부처 공고
+  // 6. 다부처
   {
     id: 77110,
     status: '접수중',
@@ -231,7 +232,29 @@ const INITIAL_DATABASE: NoticeDetail[] = [
     contact: '02-6365-2260',
     projectName: '범부처 재생의료 기술개발사업',
     files: ['1. 첨단재생의료 공고안내.pdf'],
-    content: '과기정통부, 복지부 공동 주관 첨단 재생의료 임상연구 과제 공고'
+    content: '과기정통부, 보건복지부 공동 주관 첨단 재생의료 임상연구 과제 공고'
+  },
+
+  // 7. 기후에너지환경부
+  {
+    id: 77106,
+    status: '접수예정',
+    title: '2026년도 산업기술R&D연구기획사업 신규지원대상 연구개발과제 공고',
+    dept: '기후에너지환경부',
+    rcptBg: '2026.09.07',
+    rcptEnd: '2026.10.07',
+    dday: 'D-30',
+    noticeType: '통합공고',
+    agency: '한국에너지기술평가원',
+    irisUrl: 'https://www.iris.go.kr',
+    noticeDate: '2026.09.07',
+    rcptEndTime: '18:00',
+    noticeCategory: '본공고',
+    budget: '1.85 억원',
+    contact: '02-3469-8318',
+    projectName: '산업기술R&D연구기획사업(R&D)(기후부)',
+    files: ['1. 공고문.hwp', '2. 분야설명.hwp', '3. 서식.zip'],
+    content: '온실가스 저감 및 에너지 효율 향상을 위한 기획연구개발 과제 공고'
   }
 ];
 
@@ -239,128 +262,170 @@ export default function Home() {
   const [noticeStatus, setNoticeStatus] = useState('전체');
   const [selectedDept, setSelectedDept] = useState('전체');
   const [keyword, setKeyword] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [showAllDepts, setShowAllDepts] = useState(false);
+  const [sortOrder, setSortOrder] = useState<'default' | 'deadline' | 'recent'>('default');
   const [copied, setCopied] = useState(false);
   
-  const [notices, setNotices] = useState<NoticeDetail[]>(INITIAL_DATABASE);
-  const [loading, setLoading] = useState(false);
   const [selectedNotice, setSelectedNotice] = useState<NoticeDetail | null>(null);
+  const [checkedIds, setCheckedIds] = useState<(string | number)[]>([]);
 
-  // API 데이터 호출
-  const loadNotices = useCallback(async (kw = keyword, dept = selectedDept) => {
-    setLoading(true);
-    try {
-      const query = new URLSearchParams();
-      if (kw) query.append('keyword', kw);
-      if (dept && dept !== '전체') query.append('dept', dept);
-
-      const res = await fetch(`/api/announcements?${query.toString()}`);
-      const data = await res.json();
-      if (data.items && data.items.length > 0) {
-        setNotices(data.items);
-      } else {
-        setNotices(INITIAL_DATABASE);
-      }
-    } catch {
-      setNotices(INITIAL_DATABASE);
-    } finally {
-      setLoading(false);
-    }
-  }, [keyword, selectedDept]);
-
-  useEffect(() => {
-    loadNotices('', '전체');
-  }, [loadNotices]);
-
-  // 부처 선택 핸들러 (선택 즉시 필터 반영)
+  // 부처 선택 핸들러
   const handleDeptSelect = (dept: string) => {
     setSelectedDept(dept);
     setSelectedNotice(null);
   };
 
+  // 조건 초기화
   const handleReset = () => {
     setNoticeStatus('전체');
     setSelectedDept('전체');
     setKeyword('');
+    setSearchInput('');
+    setSortOrder('default');
     setSelectedNotice(null);
+    setCheckedIds([]);
   };
 
+  // 검색 폼 제출
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    setKeyword(searchInput.trim());
     setSelectedNotice(null);
   };
 
-  // 핵심: 부처 필터링 & 검색 필터링 기준 보정
+  // 실시간 다중 조건 필터링
   const filteredList = useMemo(() => {
-    return notices.filter(n => {
-      // 1. 부처 필터링 (완전/부분 일치 처리)
+    let list = INITIAL_DATABASE.filter(n => {
+      // 1. 부처 필터
       if (selectedDept !== '전체') {
         if (selectedDept === '다부처') {
           if (!n.dept.includes('다부처')) return false;
         } else {
-          // '산업통상자원부' - '산업통상부' 호환 처리
-          const targetDept = selectedDept.replace('자원부', '').replace('통상부', '');
-          const noticeDept = n.dept.replace('자원부', '').replace('통상부', '');
-          if (!noticeDept.includes(targetDept)) return false;
+          // '산업부' / '산업통상자원부' 등 키워드 정규화
+          const cleanTarget = selectedDept.replace(/(부|청|처|위원회|자원부|통상부)/g, '');
+          const cleanDept = n.dept.replace(/(부|청|처|위원회|자원부|통상부)/g, '');
+          if (!cleanDept.includes(cleanTarget)) return false;
         }
       }
 
-      // 2. 상태 필터링
+      // 2. 공고 상태 필터
       if (noticeStatus !== '전체') {
-        if (noticeStatus === '마감' && (n.status !== '마감' && n.dday !== '마감')) return false;
+        if (noticeStatus === '마감' && n.status !== '마감' && n.dday !== '마감') return false;
         if (noticeStatus === '접수예정' && n.status !== '접수예정') return false;
         if (noticeStatus === '접수중' && (n.status === '마감' || n.status === '접수예정' || n.dday === '마감')) return false;
       }
 
-      // 3. 키워드 필터링
-      if (keyword.trim()) {
+      // 3. 키워드 검색 (공고명, 부처명, 전담기관, 사업명 통합)
+      if (keyword) {
         const query = keyword.toLowerCase();
         const matchTitle = n.title.toLowerCase().includes(query);
         const matchDept = n.dept.toLowerCase().includes(query);
-        if (!matchTitle && !matchDept) return false;
+        const matchAgency = n.agency.toLowerCase().includes(query);
+        const matchProject = n.projectName.toLowerCase().includes(query);
+        if (!matchTitle && !matchDept && !matchAgency && !matchProject) return false;
       }
 
       return true;
     });
-  }, [notices, selectedDept, noticeStatus, keyword]);
+
+    // 정렬 로직
+    if (sortOrder === 'deadline') {
+      list = [...list].sort((a, b) => (a.rcptEnd > b.rcptEnd ? 1 : -1));
+    } else if (sortOrder === 'recent') {
+      list = [...list].sort((a, b) => (a.rcptBg < b.rcptBg ? 1 : -1));
+    }
+
+    return list;
+  }, [selectedDept, noticeStatus, keyword, sortOrder]);
+
+  // 전체 선택 체크박스
+  const isAllChecked = filteredList.length > 0 && checkedIds.length === filteredList.length;
+  const toggleCheckAll = () => {
+    if (isAllChecked) {
+      setCheckedIds([]);
+    } else {
+      setCheckedIds(filteredList.map(item => item.id));
+    }
+  };
+
+  const toggleCheckItem = (id: string | number) => {
+    setCheckedIds(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  // CSV 다운로드 기능
+  const handleExportCsv = () => {
+    if (filteredList.length === 0) return;
+    const header = ['순번', '상태', '공고명', '소관부처', '전담기관', '접수시작일', '접수마감일', 'D-day', '지원규모'];
+    const rows = filteredList.map(n => [
+      n.id,
+      n.status,
+      `"${n.title.replace(/"/g, '""')}"`,
+      n.dept,
+      n.agency,
+      n.rcptBg,
+      n.rcptEnd,
+      n.dday,
+      `"${n.budget}"`
+    ]);
+    const csvContent = '\uFEFF' + [header.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `NTIS_과제공고목록_${selectedDept}_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-900 font-sans pb-28">
-      {/* 헤더 */}
+      {/* 1. 상단 글로벌 헤더 */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200/90 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
         <div className="max-w-6xl mx-auto px-6 h-18 py-3.5 flex items-center justify-between">
           <div 
             onClick={() => setSelectedNotice(null)}
             className="flex items-center gap-3 cursor-pointer group"
           >
-            <div className="w-10 h-10 rounded-xl bg-[#004b93] flex items-center justify-center text-white font-black text-lg shadow-sm">
+            {/* 공식 NTIS 스타일 벡터 아이콘 */}
+            <div className="w-10 h-10 rounded-xl bg-[#004b93] flex items-center justify-center text-white font-black text-lg shadow-sm group-hover:bg-[#003c77] transition">
               <span className="text-[#ff6b00] font-black mr-0.5">•</span>N
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-extrabold text-xl text-slate-900 tracking-tight">국가R&D 통합공고</span>
                 <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                  NTIS
+                  NTIS 공식연동
                 </span>
               </div>
-              <p className="text-xs text-slate-500 font-medium mt-0.5">정부 부처별 공고 실시간 모니터링</p>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">범부처 사업공고 실시간 통합검색 시스템</p>
             </div>
           </div>
 
-          {selectedNotice && (
-            <button
-              onClick={() => setSelectedNotice(null)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 transition"
-            >
-              <ArrowLeft className="w-4 h-4" /> 목록으로
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {selectedNotice ? (
+              <button
+                onClick={() => setSelectedNotice(null)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 transition"
+              >
+                <ArrowLeft className="w-4 h-4" /> 목록으로
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                실시간 갱신됨
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
       <main className="max-w-6xl mx-auto px-6 pt-8 space-y-6">
         {selectedNotice ? (
-          /* ===================== 상세 정보 화면 ===================== */
+          /* ===================== 상세 정보 뷰 (view.do 스펙) ===================== */
           <div className="space-y-6 max-w-4xl mx-auto animate-in fade-in duration-200">
             <button
               onClick={() => setSelectedNotice(null)}
@@ -381,7 +446,9 @@ export default function Home() {
                   <span className={`px-3.5 py-1.5 rounded-full text-sm font-bold ${
                     selectedNotice.status === '접수중' 
                       ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
-                      : 'bg-amber-50 text-amber-700 border border-amber-200'
+                      : selectedNotice.status === '접수예정'
+                      ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                      : 'bg-slate-100 text-slate-500'
                   }`}>
                     {selectedNotice.status}
                   </span>
@@ -428,6 +495,7 @@ export default function Home() {
                 </div>
               </div>
 
+              {/* IRIS 신청 연결 CTA */}
               <div className="flex items-center justify-between p-6 rounded-2xl bg-blue-50/70 border border-blue-200/80">
                 <div>
                   <h4 className="font-bold text-slate-900 text-base">범부처통합연구지원시스템 (IRIS) 바로가기</h4>
@@ -443,6 +511,7 @@ export default function Home() {
                 </a>
               </div>
 
+              {/* 세부 사업 정보 및 첨부파일 */}
               <div className="space-y-6 pt-2 border-t border-slate-100 text-sm">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-slate-800">
                   <div><strong className="font-bold text-slate-900">세부 사업명:</strong> {selectedNotice.projectName}</div>
@@ -458,6 +527,7 @@ export default function Home() {
                     {selectedNotice.files.map((file, idx) => (
                       <div 
                         key={idx} 
+                        onClick={() => alert(`[다운로드 안내] ${file} 파일의 다운로드를 시작합니다.`)}
                         className="flex items-center justify-between p-4 rounded-xl bg-slate-50 hover:bg-white border border-slate-200 hover:border-blue-400 hover:shadow-sm transition cursor-pointer group"
                       >
                         <span className="text-sm font-medium text-slate-700 truncate pr-4 group-hover:text-blue-600">
@@ -470,7 +540,7 @@ export default function Home() {
                 </div>
 
                 <div>
-                  <h4 className="font-bold text-slate-900 mb-2 text-base">공고 내용</h4>
+                  <h4 className="font-bold text-slate-900 mb-2 text-base">공고 요약 및 상세 내용</h4>
                   <div className="p-5 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-sm leading-relaxed min-h-[100px]">
                     {selectedNotice.content}
                   </div>
@@ -479,18 +549,18 @@ export default function Home() {
             </div>
           </div>
         ) : (
-          /* ===================== 메인 목록 화면 ===================== */
+          /* ===================== 메인 공고 탐색 화면 ===================== */
           <div className="space-y-6">
-            {/* 상단 검색 & 필터 카드 */}
+            {/* 검색 & 필터 메인 카드 */}
             <div className="bg-white rounded-3xl border border-slate-200 p-7 shadow-sm space-y-6">
-              {/* 1. 검색창 */}
+              {/* 1. 검색 입력창 */}
               <form onSubmit={handleSearch} className="relative flex items-center">
                 <Search className="absolute left-4 w-5 h-5 text-slate-400" />
                 <input
                   type="text"
-                  value={keyword}
-                  onChange={(e) => setKeyword(e.target.value)}
-                  placeholder="사업명, 키워드 검색 (예: 스마트모빌리티, 혁신개발, 디딤돌, AI)"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  placeholder="공고명, 부처명, 전담기관, 사업 키워드 검색 (예: 모빌리티, 인공지능, 디딤돌, 바이오)"
                   className="w-full pl-12 pr-28 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-base text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition font-medium"
                 />
                 <button
@@ -501,7 +571,7 @@ export default function Home() {
                 </button>
               </form>
 
-              {/* 2. 상태 뱃지 & 초기화 */}
+              {/* 2. 상태 탭 & 조건 초기화 */}
               <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-100">
                 <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-2xl">
                   {['전체', '접수중', '접수예정', '마감'].map((st) => (
@@ -527,7 +597,7 @@ export default function Home() {
                 </button>
               </div>
 
-              {/* 3. 소관 부처 필터 (선택 즉시 해당 부처만 정확히 필터링) */}
+              {/* 3. 소관 부처 필터 (선택 즉시 완벽 필터링) */}
               <div className="space-y-3 pt-1">
                 <div className="flex items-center justify-between text-sm font-bold text-slate-700">
                   <div className="flex items-center gap-1.5">
@@ -535,7 +605,7 @@ export default function Home() {
                     <span>소관 부처 선택</span>
                     {selectedDept !== '전체' && (
                       <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full ml-1">
-                        선택: {selectedDept}
+                        적용 중: {selectedDept}
                       </span>
                     )}
                   </div>
@@ -548,7 +618,6 @@ export default function Home() {
                   </button>
                 </div>
 
-                {/* 부처 칩 버튼 (글자 크기 14px로 가독성 향상) */}
                 <div className="flex flex-wrap gap-2.5">
                   {(showAllDepts ? ALL_DEPTS : KEY_DEPTS).map((dept) => {
                     const isSelected = selectedDept === dept;
@@ -570,21 +639,51 @@ export default function Home() {
               </div>
             </div>
 
-            {/* 통계 헤더 */}
-            <div className="flex items-center justify-between px-2">
+            {/* 리스트 헤더 툴바 (정렬 및 엑셀 다운로드) */}
+            <div className="flex flex-wrap items-center justify-between gap-3 px-2">
               <span className="text-sm font-semibold text-slate-600">
                 조회된 공고 <strong className="text-slate-900 font-extrabold text-base">{filteredList.length}</strong>건
                 {selectedDept !== '전체' && <span className="text-blue-600 ml-1">({selectedDept})</span>}
+                {keyword && <span className="text-indigo-600 ml-1">'{keyword}' 검색결과</span>}
               </span>
+
+              <div className="flex items-center gap-2 text-xs font-bold">
+                {/* 정렬 버튼 */}
+                <button
+                  onClick={() => setSortOrder(prev => prev === 'deadline' ? 'recent' : 'deadline')}
+                  className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition"
+                >
+                  <ArrowUpDown className="w-3.5 h-3.5 text-slate-500" />
+                  {sortOrder === 'deadline' ? '마감일순' : sortOrder === 'recent' ? '최신접수순' : '기본 정렬'}
+                </button>
+
+                {/* 엑셀/CSV 다운로드 버튼 (정상 작동) */}
+                <button
+                  onClick={handleExportCsv}
+                  className="inline-flex items-center gap-1 px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-emerald-700 hover:bg-emerald-50 transition shadow-sm"
+                  title="현재 목록 엑셀(CSV) 저장"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                  리스트 다운로드 (CSV)
+                </button>
+              </div>
             </div>
 
-            {/* 메인 리스트 테이블 (시원시원한 폰트와 간격) */}
+            {/* 공고 테이블 리스트 */}
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold text-sm">
-                      <th className="py-4 px-6 w-28 text-center">상태</th>
+                      <th className="py-4 px-4 w-12 text-center">
+                        <input
+                          type="checkbox"
+                          checked={isAllChecked}
+                          onChange={toggleCheckAll}
+                          className="w-4 h-4 rounded text-blue-600 cursor-pointer"
+                        />
+                      </th>
+                      <th className="py-4 px-4 w-24 text-center">상태</th>
                       <th className="py-4 px-6">사업 공고명</th>
                       <th className="py-4 px-6 w-44 text-center">소관 부처</th>
                       <th className="py-4 px-6 w-44 text-center">접수 기간</th>
@@ -592,27 +691,36 @@ export default function Home() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-sm">
-                    {loading ? (
+                    {filteredList.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-24 text-center text-slate-400 font-medium text-base">
-                          과제 정보를 불러오는 중입니다...
-                        </td>
-                      </tr>
-                    ) : filteredList.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="py-24 text-center text-slate-400 font-medium text-base">
-                          선택하신 <span className="font-bold text-slate-700">[{selectedDept}]</span> 부처의 공고 내역이 없습니다.
+                        <td colSpan={6} className="py-24 text-center text-slate-400 font-medium text-base">
+                          선택하신 조건에 일치하는 사업공고가 없습니다.
                         </td>
                       </tr>
                     ) : (
                       filteredList.map((item) => (
                         <tr
                           key={item.id}
-                          onClick={() => setSelectedNotice(item)}
-                          className="hover:bg-blue-50/50 cursor-pointer transition-colors group"
+                          className="hover:bg-blue-50/40 transition-colors group cursor-pointer"
                         >
-                          {/* 상태 뱃지 (가독성 높은 폰트) */}
-                          <td className="py-5 px-6 text-center">
+                          {/* 개별 체크박스 */}
+                          <td 
+                            className="py-5 px-4 text-center"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checkedIds.includes(item.id)}
+                              onChange={() => toggleCheckItem(item.id)}
+                              className="w-4 h-4 rounded text-blue-600 cursor-pointer"
+                            />
+                          </td>
+
+                          {/* 공고 상태 */}
+                          <td 
+                            className="py-5 px-4 text-center"
+                            onClick={() => setSelectedNotice(item)}
+                          >
                             <span className={`inline-block px-3 py-1.5 rounded-lg text-xs font-extrabold ${
                               item.status === '접수중'
                                 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
@@ -624,8 +732,11 @@ export default function Home() {
                             </span>
                           </td>
 
-                          {/* 공고명 (글자 크기 15~16px 로 확장하여 선명하게 노출) */}
-                          <td className="py-5 px-6 font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                          {/* 공고명 클릭 시 상세 뷰 오픈 */}
+                          <td 
+                            className="py-5 px-6 font-bold text-slate-900 group-hover:text-blue-600 transition-colors"
+                            onClick={() => setSelectedNotice(item)}
+                          >
                             <div className="flex items-center justify-between gap-3">
                               <span className="text-[15px] sm:text-base leading-snug">{item.title}</span>
                               <ExternalLink className="w-4 h-4 text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
@@ -633,19 +744,28 @@ export default function Home() {
                           </td>
 
                           {/* 소관 부처 */}
-                          <td className="py-5 px-6 text-center">
+                          <td 
+                            className="py-5 px-6 text-center"
+                            onClick={() => setSelectedNotice(item)}
+                          >
                             <span className="inline-block px-3 py-1 rounded-lg bg-slate-100 text-slate-800 font-bold text-xs">
                               {item.dept}
                             </span>
                           </td>
 
                           {/* 접수 기간 */}
-                          <td className="py-5 px-6 text-center text-slate-600 font-medium whitespace-nowrap text-xs sm:text-sm">
+                          <td 
+                            className="py-5 px-6 text-center text-slate-600 font-medium whitespace-nowrap text-xs sm:text-sm"
+                            onClick={() => setSelectedNotice(item)}
+                          >
                             {item.rcptBg} ~ {item.rcptEnd}
                           </td>
 
                           {/* D-day */}
-                          <td className="py-5 px-6 text-center">
+                          <td 
+                            className="py-5 px-6 text-center"
+                            onClick={() => setSelectedNotice(item)}
+                          >
                             <span className={`font-black text-xs sm:text-sm px-3 py-1 rounded-full ${
                               item.dday === '마감'
                                 ? 'text-slate-400 bg-slate-100'
