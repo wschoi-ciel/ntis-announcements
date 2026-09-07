@@ -1,14 +1,14 @@
+// app/page.tsx
 'use client';
 
-import { useState, useMemo } from 'react';
-import { Search, RotateCcw, ExternalLink, Calendar } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Search, RotateCcw, ExternalLink } from 'lucide-react';
 
-// 부처 목록 정의
 const DEPARTMENTS = [
   '전체', '다부처', '과학기술정보통신부', '산업통상자원부', '중소벤처기업부', 
   '기후에너지환경부', '보건복지부', '교육부', '국토교통부', '농림축산식품부', 
   '해양수산부', '행정안전부', '방위사업청', '식품의약품안전처', '기상청', 
-  '농촌진흥청', '산림청', '소방청', '질병관리청', '해양경찰청', '특허청', '기타'
+  '농촌진흥청', '산림청', '소방청', '질병관리청', '특허청', '기타'
 ];
 
 const STATUS_LIST = ['전체', '접수예정', '접수중', '마감'];
@@ -17,13 +17,12 @@ interface NoticeItem {
   ancmId?: string;
   ancmNm: string;
   deptNm?: string;
-  rcptBgDt?: string; // 접수시작일 (YYYY.MM.DD 또는 YYYYMMDD)
-  rcptEndDt?: string; // 접수마감일
+  rcptBgDt?: string;
+  rcptEndDt?: string;
   status?: string;
   dtlUrl?: string;
 }
 
-// D-day 계산 함수
 function calculateDday(endDateStr?: string) {
   if (!endDateStr) return '-';
   const cleanDate = endDateStr.replace(/[^0-9]/g, '');
@@ -37,9 +36,7 @@ function calculateDday(endDateStr?: string) {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
 
-  const diffTime = end.getTime() - now.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
+  const diffDays = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
   if (diffDays < 0) return '마감';
   if (diffDays === 0) return 'D-Day';
   return `D-${diffDays}`;
@@ -52,44 +49,41 @@ export default function Home() {
   const [notices, setNotices] = useState<NoticeItem[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // API 데이터 호출
-  const fetchNotices = async (queryKeyword = keyword, queryDept = selectedDept) => {
+  const loadData = async (kw = keyword, dept = selectedDept) => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (queryKeyword) params.append('keyword', queryKeyword);
-      if (queryDept !== '전체') params.append('dept', queryDept);
+      const query = new URLSearchParams();
+      if (kw) query.append('keyword', kw);
+      if (dept && dept !== '전체') query.append('dept', dept);
 
-      const res = await fetch(`/api/announcements?${params.toString()}`);
-      const result = await res.json();
-      
-      const items = result?.response?.body?.items?.item || [];
-      const parsedItems = Array.isArray(items) ? items : [items];
-      setNotices(parsedItems);
-    } catch (err) {
-      console.error(err);
+      const res = await fetch(`/api/announcements?${query.toString()}`);
+      const data = await res.json();
+      setNotices(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error(e);
     } finally {
       setLoading(false);
     }
   };
 
-  // 초기화 핸들러
+  // 최초 페이지 진입 시 전체 공고 즉시 로드
+  useEffect(() => {
+    loadData('', '전체');
+  }, []);
+
   const handleReset = () => {
     setSelectedDept('전체');
     setSelectedStatus('전체');
     setKeyword('');
-    fetchNotices('', '전체');
+    loadData('', '전체');
   };
 
-  // 클라이언트 사이드 상태 및 필터링 (NTIS API 응답 보정)
   const filteredNotices = useMemo(() => {
     return notices.filter((item) => {
-      // 부처 필터
       if (selectedDept !== '전체') {
         if (selectedDept === '다부처' && !item.deptNm?.includes('다부처')) return false;
         if (selectedDept !== '다부처' && item.deptNm !== selectedDept) return false;
       }
-      // 상태 필터
       if (selectedStatus !== '전체') {
         const dday = calculateDday(item.rcptEndDt);
         if (selectedStatus === '마감' && dday !== '마감') return false;
@@ -101,65 +95,62 @@ export default function Home() {
   }, [notices, selectedDept, selectedStatus]);
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] text-[#333]">
-      {/* 최상단 타이틀 */}
-      <header className="bg-white border-b border-gray-200 py-4 px-6 mb-6">
-        <h1 className="text-xl font-bold text-gray-900">국가R&D 통합공고 조회 시스템</h1>
+    <div className="min-h-screen bg-[#f5f6f8] text-[#333]">
+      <header className="bg-white border-b border-gray-200 py-3 px-6 shadow-sm">
+        <h1 className="text-xl font-bold text-gray-900 tracking-tight">국가R&D 통합공고</h1>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 pb-12 space-y-4">
-        {/* 필터 영역 박스 */}
+      <main className="max-w-7xl mx-auto px-4 py-6 space-y-4">
+        {/* 필터 영역 */}
         <div className="bg-white border border-gray-300 rounded shadow-sm text-xs">
-          
-          {/* 1. 공고현황 필터 */}
+          {/* 현황 */}
           <div className="flex border-b border-gray-200">
-            <div className="w-28 bg-[#f4f6f9] font-semibold text-gray-700 p-3 flex items-center justify-center border-r border-gray-200">
+            <div className="w-24 bg-[#f8f9fa] font-semibold text-gray-700 p-2.5 flex items-center justify-center border-r border-gray-200">
               공고현황
             </div>
             <div className="flex flex-wrap gap-1 p-2">
-              {STATUS_LIST.map((status) => (
+              {STATUS_LIST.map((st) => (
                 <button
-                  key={status}
-                  onClick={() => setSelectedStatus(status)}
-                  className={`px-4 py-1.5 rounded transition ${
-                    selectedStatus === status
+                  key={st}
+                  onClick={() => setSelectedStatus(st)}
+                  className={`px-3 py-1 rounded transition ${
+                    selectedStatus === st
                       ? 'bg-[#ff6b00] text-white font-bold'
-                      : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                      : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
                   }`}
                 >
-                  {status}
+                  {st}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* 2. 부처명 그리드 선택기 */}
+          {/* 부처 그리드 */}
           <div className="flex">
-            <div className="w-28 bg-[#f4f6f9] font-semibold text-gray-700 p-3 flex items-center justify-center border-r border-gray-200">
+            <div className="w-24 bg-[#f8f9fa] font-semibold text-gray-700 p-2.5 flex items-center justify-center border-r border-gray-200">
               부처명
             </div>
             <div className="flex-1 p-2">
-              <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-1">
+              <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-7 gap-1">
                 {DEPARTMENTS.map((dept) => (
                   <button
                     key={dept}
                     onClick={() => {
                       setSelectedDept(dept);
-                      fetchNotices(keyword, dept);
+                      loadData(keyword, dept);
                     }}
-                    className={`py-1.5 px-2 text-center truncate rounded transition ${
+                    className={`py-1 px-1.5 text-center truncate rounded transition ${
                       selectedDept === dept
                         ? 'bg-[#ff6b00] text-white font-bold'
-                        : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                        : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
                     }`}
-                    title={dept}
                   >
                     {dept}
                   </button>
                 ))}
                 <button
                   onClick={handleReset}
-                  className="flex items-center justify-center gap-1 py-1.5 px-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded border border-gray-300 font-semibold"
+                  className="flex items-center justify-center gap-1 py-1 px-1.5 text-gray-600 bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 font-semibold"
                 >
                   <RotateCcw className="h-3 w-3" /> 초기화
                 </button>
@@ -168,81 +159,82 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 3. 검색 입력창 */}
-        <div className="bg-white border border-gray-300 rounded p-4 flex gap-3 shadow-sm">
-          <div className="relative flex-1">
-            <input
-              type="text"
-              placeholder="국가R&D 통합공고 키워드 검색 (예: 인공지능, 이차전지, 바이오)"
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && fetchNotices(keyword, selectedDept)}
-              className="w-full pl-3 pr-10 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-500"
-            />
-          </div>
+        {/* 키워드 검색 */}
+        <div className="bg-white border border-gray-300 rounded p-3 flex gap-2 shadow-sm">
+          <input
+            type="text"
+            placeholder="국가R&D통합공고 키워드 검색 (예: 에너지, 인공지능, 공모)"
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && loadData(keyword, selectedDept)}
+            className="flex-1 px-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-500"
+          />
           <button
-            onClick={() => fetchNotices(keyword, selectedDept)}
-            className="px-6 py-2 bg-[#0070d2] text-white rounded text-sm font-semibold flex items-center gap-1 hover:bg-[#005bb5] transition"
+            onClick={() => loadData(keyword, selectedDept)}
+            className="px-5 py-1.5 bg-[#0070d2] text-white text-sm font-semibold rounded hover:bg-[#005bb5] transition flex items-center gap-1"
           >
             <Search className="h-4 w-4" /> 검색
           </button>
         </div>
 
-        {/* 4. 검색 결과 테이블 */}
+        {/* 공고 테이블 */}
         <div className="bg-white border border-gray-300 rounded shadow-sm overflow-hidden">
-          <div className="p-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center text-sm font-semibold text-gray-700">
-            <span>검색결과: {filteredNotices.length} 건</span>
+          <div className="p-3 bg-[#f8f9fa] border-b border-gray-200 text-xs font-semibold text-gray-700">
+            검색결과 <span className="text-[#0070d2] font-bold">{filteredNotices.length}</span>건
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
-              <thead className="bg-[#f4f6f9] border-b border-gray-200 text-gray-600">
+              <thead className="bg-[#f4f6f9] border-b border-gray-200 text-gray-600 font-semibold">
                 <tr>
-                  <th className="py-2.5 px-4 text-center w-16">순번</th>
-                  <th className="py-2.5 px-4 text-center w-24">현황</th>
+                  <th className="py-2.5 px-3 text-center w-16">순번</th>
+                  <th className="py-2.5 px-3 text-center w-24">현황</th>
                   <th className="py-2.5 px-4">공고명</th>
-                  <th className="py-2.5 px-4 text-center w-36">소관부처</th>
-                  <th className="py-2.5 px-4 text-center w-28">접수일</th>
-                  <th className="py-2.5 px-4 text-center w-28">마감일</th>
-                  <th className="py-2.5 px-4 text-center w-20">D-day</th>
+                  <th className="py-2.5 px-3 text-center w-36">부처명</th>
+                  <th className="py-2.5 px-3 text-center w-28">접수일</th>
+                  <th className="py-2.5 px-3 text-center w-28">마감일</th>
+                  <th className="py-2.5 px-3 text-center w-20">D-day</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-12 text-gray-400">
+                    <td colSpan={7} className="text-center py-10 text-gray-400">
                       데이터를 불러오는 중입니다...
                     </td>
                   </tr>
                 ) : filteredNotices.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-12 text-gray-400">
-                      조회된 공고 내역이 없습니다.
+                    <td colSpan={7} className="text-center py-10 text-gray-400">
+                      해당 조건의 공고가 존재하지 않습니다.
                     </td>
                   </tr>
                 ) : (
-                  filteredNotices.map((notice, idx) => {
-                    const dday = calculateDday(notice.rcptEndDt);
+                  filteredNotices.map((item, idx) => {
+                    const dday = calculateDday(item.rcptEndDt);
+                    const isUpcoming = item.status === '접수예정';
                     return (
-                      <tr key={notice.ancmId || idx} className="hover:bg-blue-50/40 transition">
-                        <td className="py-3 px-4 text-center text-gray-500">{idx + 1}</td>
-                        <td className="py-3 px-4 text-center">
+                      <tr key={item.ancmId || idx} className="hover:bg-blue-50/30 transition">
+                        <td className="py-2.5 px-3 text-center text-gray-500">{item.ancmId || idx + 1}</td>
+                        <td className="py-2.5 px-3 text-center">
                           <span
-                            className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
-                              dday === '마감'
-                                ? 'bg-gray-100 text-gray-500'
+                            className={`px-2 py-0.5 rounded font-semibold text-[11px] ${
+                              isUpcoming
+                                ? 'bg-blue-50 text-blue-600 border border-blue-200'
+                                : dday === '마감'
+                                ? 'bg-gray-100 text-gray-400'
                                 : 'bg-red-50 text-red-600 border border-red-200'
                             }`}
                           >
-                            {dday === '마감' ? '마감' : '접수중'}
+                            {isUpcoming ? '접수예정' : dday === '마감' ? '마감' : '접수중'}
                           </span>
                         </td>
-                        <td className="py-3 px-4 font-medium text-gray-900">
+                        <td className="py-2.5 px-4 font-medium text-gray-800">
                           <div className="flex items-center gap-1.5">
-                            <span className="hover:underline cursor-pointer">{notice.ancmNm}</span>
-                            {notice.dtlUrl && (
+                            <span className="hover:underline cursor-pointer">{item.ancmNm}</span>
+                            {item.dtlUrl && item.dtlUrl !== '#' && (
                               <a
-                                href={notice.dtlUrl}
+                                href={item.dtlUrl}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="text-gray-400 hover:text-blue-600 inline-block"
@@ -252,10 +244,10 @@ export default function Home() {
                             )}
                           </div>
                         </td>
-                        <td className="py-3 px-4 text-center text-gray-600">{notice.deptNm || '-'}</td>
-                        <td className="py-3 px-4 text-center text-gray-500">{notice.rcptBgDt || '-'}</td>
-                        <td className="py-3 px-4 text-center text-gray-500">{notice.rcptEndDt || '-'}</td>
-                        <td className="py-3 px-4 text-center font-bold text-[#ff6b00]">{dday}</td>
+                        <td className="py-2.5 px-3 text-center text-gray-600">{item.deptNm || '-'}</td>
+                        <td className="py-2.5 px-3 text-center text-gray-500">{item.rcptBgDt || '-'}</td>
+                        <td className="py-2.5 px-3 text-center text-gray-500">{item.rcptEndDt || '-'}</td>
+                        <td className="py-2.5 px-3 text-center font-bold text-[#ff6b00]">{dday}</td>
                       </tr>
                     );
                   })
