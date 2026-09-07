@@ -1,7 +1,7 @@
 // app/page.tsx
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, RotateCcw, Calendar, ExternalLink } from 'lucide-react';
 
 const DEPARTMENTS = [
@@ -24,7 +24,6 @@ interface Notice {
 }
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState('공고정보');
   const [noticeType, setNoticeType] = useState('전체');
   const [noticeStatus, setNoticeStatus] = useState('전체');
   const [selectedDept, setSelectedDept] = useState('전체');
@@ -33,12 +32,15 @@ export default function Home() {
   const [notices, setNotices] = useState<Notice[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
   const [allChecked, setAllChecked] = useState(false);
   const [checkedItems, setCheckedItems] = useState<(string | number)[]>([]);
 
-  // 실제 API 데이터 호출 함수
-  const fetchApiData = async (kw = keyword, dept = selectedDept) => {
+  // OpenAPI 호출 함수
+  const fetchOpenApiData = useCallback(async (kw = keyword, dept = selectedDept) => {
     setLoading(true);
+    setErrorMessage('');
     try {
       const query = new URLSearchParams();
       if (kw) query.append('keyword', kw);
@@ -48,42 +50,45 @@ export default function Home() {
       const res = await fetch(`/api/announcements?${query.toString()}`);
       const data = await res.json();
 
-      if (data.items) {
-        setNotices(data.items);
-        setTotalCount(data.totalCount || data.items.length);
-      } else {
+      if (!res.ok || data.success === false) {
+        setErrorMessage(data.message || '데이터를 불러오는 중 오류가 발생했습니다.');
         setNotices([]);
         setTotalCount(0);
+        return;
       }
-    } catch (err) {
-      console.error('Fetch error:', err);
+
+      setNotices(data.items || []);
+      setTotalCount(data.totalCount || (data.items ? data.items.length : 0));
+    } catch (err: any) {
+      setErrorMessage(err.message || '서버 통신 실패');
       setNotices([]);
+      setTotalCount(0);
     } finally {
       setLoading(false);
     }
-  };
+  }, [keyword, selectedDept]);
 
-  // 컴포넌트 마운트 시 첫 전체 공고 자동 로드
+  // 첫 화면 접속 시 실시간 API 데이터 즉시 로드
   useEffect(() => {
-    fetchApiData('', '전체');
-  }, []);
+    fetchOpenApiData('', '전체');
+  }, [fetchOpenApiData]);
+
+  const handleDeptSelect = (dept: string) => {
+    setSelectedDept(dept);
+    fetchOpenApiData(keyword, dept);
+  };
 
   const handleReset = () => {
     setNoticeType('전체');
     setNoticeStatus('전체');
     setSelectedDept('전체');
     setKeyword('');
-    fetchApiData('', '전체');
-  };
-
-  const handleDeptSelect = (dept: string) => {
-    setSelectedDept(dept);
-    fetchApiData(keyword, dept);
+    fetchOpenApiData('', '전체');
   };
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    fetchApiData(keyword, selectedDept);
+    fetchOpenApiData(keyword, selectedDept);
   };
 
   const handleCheckAll = () => {
@@ -101,7 +106,7 @@ export default function Home() {
     );
   };
 
-  // 공고현황 필터(접수중/접수예정/마감) 클라이언트 필터링
+  // 공고현황(접수예정, 접수중, 마감) 필터링
   const filteredList = useMemo(() => {
     return notices.filter(n => {
       if (noticeStatus === '전체') return true;
@@ -114,27 +119,13 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#f8f9fa] text-[#333] font-sans pb-16">
-      {/* 1. 상단 타이틀 & 탭 */}
+      {/* 1. 최상단 타이틀 (상단 탭 완전 제거) */}
       <div className="max-w-[1240px] mx-auto pt-6 px-4">
         <h1 className="text-2xl font-black text-black tracking-tight mb-4">국가R&D통합공고</h1>
-
-        <div className="flex border-b-2 border-[#ff6000] text-sm font-bold text-gray-600 gap-6">
-          {['공고정보', '사업자료실', 'MY공고', '알리미신청', 'RSS신청'].map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`pb-2.5 px-1 relative transition-colors ${
-                activeTab === tab ? 'text-[#ff6000]' : 'hover:text-gray-900'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
       </div>
 
-      <main className="max-w-[1240px] mx-auto px-4 mt-4 space-y-4">
-        {/* 2. 메인 조건 선택 박스 */}
+      <main className="max-w-[1240px] mx-auto px-4 space-y-4">
+        {/* 2. 조건 선택 박스 (격자형) */}
         <div className="border border-[#c7cdd5] bg-white text-[12px] shadow-sm">
           {/* 공고형태 */}
           <div className="grid grid-cols-[120px_1fr] border-b border-[#e1e4e8]">
@@ -188,16 +179,16 @@ export default function Home() {
                 >
                   전체
                 </button>
-                {DEPARTMENTS.slice(0, 46).map((d) => (
+                {DEPARTMENTS.slice(0, 46).map((dept) => (
                   <button
-                    key={d}
-                    onClick={() => handleDeptSelect(d)}
-                    title={d}
+                    key={dept}
+                    onClick={() => handleDeptSelect(dept)}
+                    title={dept}
                     className={`py-2 px-1 truncate transition-colors ${
-                      selectedDept === d ? 'bg-[#ff6000] text-white font-bold' : 'hover:bg-gray-50'
+                      selectedDept === dept ? 'bg-[#ff6000] text-white font-bold' : 'hover:bg-gray-50'
                     }`}
                   >
-                    {d}
+                    {dept}
                   </button>
                 ))}
                 <button
@@ -277,7 +268,7 @@ export default function Home() {
           </div>
         </form>
 
-        {/* 5. 결과 헤더 */}
+        {/* 5. 실시간 검색결과 헤더 */}
         <div className="flex items-center justify-between pt-2">
           <div className="text-base font-bold">
             검색결과 <span className="text-[#0070d2]">{totalCount.toLocaleString()}</span>건
@@ -292,7 +283,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 6. 공고 테이블 */}
+        {/* 6. 실시간 공고 테이블 (실제 OpenAPI 키로 연동) */}
         <div className="border-t-2 border-black border-b border-[#c7cdd5] bg-white overflow-x-auto text-[12px]">
           <table className="w-full border-collapse">
             <thead>
@@ -313,13 +304,19 @@ export default function Home() {
               {loading ? (
                 <tr>
                   <td colSpan={8} className="py-16 text-gray-400">
-                    NTIS 오픈API에서 공고 목록을 불러오는 중입니다...
+                    실제 NTIS 오픈API에서 공고 정보를 실시간으로 불러오는 중입니다...
+                  </td>
+                </tr>
+              ) : errorMessage ? (
+                <tr>
+                  <td colSpan={8} className="py-16 text-red-500 font-medium">
+                    {errorMessage}
                   </td>
                 </tr>
               ) : filteredList.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-16 text-gray-400">
-                    조회된 공고 내역이 없습니다. (인증키 설정 및 네트워크 상태를 확인해주세요)
+                    선택한 조건의 공고가 존재하지 않습니다.
                   </td>
                 </tr>
               ) : (
