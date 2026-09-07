@@ -2,142 +2,139 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { XMLParser } from 'fast-xml-parser';
 
-// API 실패 시 혹은 빈 데이터일 때 노출할 기본 전체 공고 데이터 (업로드해주신 이미지 기준)
-const FALLBACK_DATA = [
-  {
-    ancmId: "77106",
-    ancmNm: "2026년도 산업기술RD연구기획사업 신규지원대상 연구개발과제 공고",
-    deptNm: "기후에너지환경부",
-    rcptBgDt: "2026.09.07",
-    rcptEndDt: "2026.10.07",
-    status: "접수예정",
-    dtlUrl: "https://www.ntis.go.kr"
-  },
-  {
-    ancmId: "77105",
-    ancmNm: "2028년도 산업기술 RD사업(스마트전자 분야-중전기기) 기술수요조사 공고",
-    deptNm: "산업통상자원부",
-    rcptBgDt: "2026.09.03",
-    rcptEndDt: "2026.09.30",
-    status: "접수중",
-    dtlUrl: "https://www.ntis.go.kr"
-  },
-  {
-    ancmId: "77104",
-    ancmNm: "2027년 국가기록관리 활용기술 연구개발(RD)사업 과제 수요조사",
-    deptNm: "행정안전부",
-    rcptBgDt: "2026.09.02",
-    rcptEndDt: "2026.10.02",
-    status: "접수중",
-    dtlUrl: "https://www.ntis.go.kr"
-  },
-  {
-    ancmId: "77103",
-    ancmNm: "2027년도 서울지역 환경현안 해결을 위한 연구사업 과제 공모",
-    deptNm: "기후에너지환경부",
-    rcptBgDt: "2026.09.14",
-    rcptEndDt: "2026.09.14",
-    status: "접수예정",
-    dtlUrl: "https://www.ntis.go.kr"
-  },
-  {
-    ancmId: "77102",
-    ancmNm: "2027년도 자원분야 RD사업 통합기술수요조사 공고",
-    deptNm: "산업통상자원부",
-    rcptBgDt: "2026.09.04",
-    rcptEndDt: "2026.09.14",
-    status: "접수중",
-    dtlUrl: "https://www.ntis.go.kr"
-  },
-  {
-    ancmId: "77101",
-    ancmNm: "2026년 3차 재생에너지RD(태양광) 신규지원대상 연구개발과제 공고",
-    deptNm: "기후에너지환경부",
-    rcptBgDt: "2026.09.08",
-    rcptEndDt: "2026.10.01",
-    status: "접수예정",
-    dtlUrl: "https://www.ntis.go.kr"
-  },
-  {
-    ancmId: "77100",
-    ancmNm: "2026년도 바이오의료기술개발사업 2차 신규과제 선정공고",
-    deptNm: "과학기술정보통신부",
-    rcptBgDt: "2026.09.01",
-    rcptEndDt: "2026.09.28",
-    status: "접수중",
-    dtlUrl: "https://www.ntis.go.kr"
-  },
-  {
-    ancmId: "77099",
-    ancmNm: "중소기업 상용화 R&D 다부처 연계지원사업 모집공고",
-    deptNm: "다부처",
-    rcptBgDt: "2026.08.25",
-    rcptEndDt: "2026.09.25",
-    status: "접수중",
-    dtlUrl: "https://www.ntis.go.kr"
+// D-day 계산 보조 함수
+function getDday(endStr?: string) {
+  if (!endStr) return '-';
+  const clean = endStr.replace(/[^0-9]/g, '');
+  if (clean.length < 8) return '-';
+  const end = new Date(
+    parseInt(clean.substring(0, 4), 10),
+    parseInt(clean.substring(4, 6), 10) - 1,
+    parseInt(clean.substring(6, 8), 10)
+  );
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const diff = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  if (diff < 0) return '마감';
+  if (diff === 0) return 'D-Day';
+  return `D-${diff}`;
+}
+
+// 날짜 포맷 (YYYY.MM.DD)
+function formatDate(dateStr?: string) {
+  if (!dateStr) return '-';
+  const clean = dateStr.replace(/[^0-9]/g, '');
+  if (clean.length === 8) {
+    return `${clean.substring(0, 4)}.${clean.substring(4, 6)}.${clean.substring(6, 8)}`;
   }
-];
+  return dateStr;
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const keyword = searchParams.get('keyword') || '';
   const dept = searchParams.get('dept') || '';
+  const pageNo = searchParams.get('page') || '1';
+  const numOfRows = searchParams.get('rows') || '20';
 
-  const apiKey = process.env.NTIS_API_KEY;
-
-  if (!apiKey) {
-    // 키 미등록 시 즉시 Fallback 반환
-    return NextResponse.json(filterList(FALLBACK_DATA, keyword, dept));
+  const rawKey = process.env.NTIS_API_KEY;
+  if (!rawKey) {
+    return NextResponse.json({
+      success: false,
+      message: 'NTIS_API_KEY가 설정되지 않았습니다. .env.local 또는 Vercel 환경변수를 확인해주세요.',
+      items: [],
+      totalCount: 0
+    });
   }
+
+  // 공공데이터 특유의 인코딩 이중 escape 방지 처리
+  const serviceKey = decodeURIComponent(rawKey.trim());
+  const baseUrl = process.env.NTIS_API_URL || 'https://api.ntis.go.kr/openapi/service/rest/RndNoticeService/getRndNoticeList';
 
   try {
-    const targetUrl = new URL('https://api.ntis.go.kr/openapi/service/rest/RndNoticeService/getRndNoticeList');
-    targetUrl.searchParams.set('serviceKey', decodeURIComponent(apiKey));
-    targetUrl.searchParams.set('numOfRows', '50');
-    targetUrl.searchParams.set('pageNo', '1');
+    const url = new URL(baseUrl);
+    url.searchParams.set('serviceKey', serviceKey);
+    url.searchParams.set('pageNo', pageNo);
+    url.searchParams.set('numOfRows', numOfRows);
 
-    if (keyword) targetUrl.searchParams.set('searchKeyword', keyword);
-
-    const res = await fetch(targetUrl.toString(), {
-      headers: { 'Accept': 'application/xml, text/xml, */*' },
-      next: { revalidate: 600 }
-    });
-
-    const rawText = await res.text();
-    const parser = new XMLParser();
-    const jsonObj = parser.parse(rawText);
-
-    const rawItems = jsonObj?.response?.body?.items?.item;
-    
-    if (!rawItems) {
-      // API 응답 구조가 비어있거나 승인 대기 상태일 때 Fallback 제공
-      return NextResponse.json(filterList(FALLBACK_DATA, keyword, dept));
+    if (keyword) {
+      url.searchParams.set('searchKeyword', keyword);
     }
 
-    const items = Array.isArray(rawItems) ? rawItems : [rawItems];
-    
-    // NTIS 원본 필드명을 통일된 모델로 매핑
-    const normalizedItems = items.map((i: any) => ({
-      ancmId: i.ancmId || i.pblancId || String(Math.floor(Math.random() * 10000)),
-      ancmNm: i.ancmNm || i.pblancNm || '공고명 정보 없음',
-      deptNm: i.deptNm || i.jrsdMininsttNm || '부처 공통',
-      rcptBgDt: i.rcptBgDt || i.rcptBgnDe || '',
-      rcptEndDt: i.rcptEndDt || i.rcptEndDe || '',
-      status: i.status || '접수중',
-      dtlUrl: i.dtlUrl || i.dtlPageUrl || '#'
-    }));
+    const res = await fetch(url.toString(), {
+      headers: {
+        'Accept': 'application/xml, text/xml, application/json, */*'
+      },
+      next: { revalidate: 600 } // 10분 캐시
+    });
 
-    return NextResponse.json(filterList(normalizedItems, keyword, dept));
-  } catch (error) {
-    // 네트워크 장애 시에도 에러 화면 대신 목업 데이터 반환
-    return NextResponse.json(filterList(FALLBACK_DATA, keyword, dept));
+    const responseText = await res.text();
+    let rawItems: any[] = [];
+    let totalCount = 0;
+
+    // 1. JSON 응답인 경우
+    if (responseText.trim().startsWith('{')) {
+      const json = JSON.parse(responseText);
+      const body = json?.response?.body || json?.body || json;
+      totalCount = Number(body?.totalCount) || 0;
+      const items = body?.items?.item || body?.items || [];
+      rawItems = Array.isArray(items) ? items : [items];
+    } 
+    // 2. XML 응답인 경우 (NTIS 기본)
+    else {
+      const parser = new XMLParser({ ignoreAttributes: false, removeNSPrefix: true });
+      const xml = parser.parse(responseText);
+      const body = xml?.response?.body || xml?.body || xml;
+      totalCount = Number(body?.totalCount) || 0;
+      const items = body?.items?.item || body?.items || [];
+      rawItems = Array.isArray(items) ? items : [items];
+    }
+
+    // NTIS 다양한 필드명 호환 매핑
+    const notices = rawItems.filter(Boolean).map((item, index) => {
+      const title = item.ancmNm || item.pblancNm || item.title || '공고명 정보 없음';
+      const deptNm = item.deptNm || item.jrsdMininsttNm || item.mngOrgNm || item.ministry || '부처 공통';
+      const rcptBg = formatDate(item.rcptBgDt || item.rcptBgnDe || item.startDate || '');
+      const rcptEnd = formatDate(item.rcptEndDt || item.rcptEndDe || item.endDate || '');
+      const dday = getDday(item.rcptEndDt || item.rcptEndDe || item.endDate);
+
+      // 접수 상태 판별
+      let status = item.status || item.ancmStatusNm || '';
+      if (!status) {
+        if (dday === '마감') status = '마감';
+        else status = '접수중';
+      }
+
+      return {
+        id: item.ancmId || item.pblancId || item.id || (index + 1),
+        title,
+        dept: deptNm,
+        rcptBg,
+        rcptEnd,
+        status,
+        dday,
+        url: item.dtlUrl || item.dtlPageUrl || item.link || ''
+      };
+    });
+
+    // 부처 필터링 적용 (API 자체 파라미터 미지원 시 서버 사이드 필터링)
+    const filtered = dept && dept !== '전체'
+      ? notices.filter(n => dept === '다부처' ? n.dept.includes('다부처') : n.dept.includes(dept))
+      : notices;
+
+    return NextResponse.json({
+      success: true,
+      totalCount: totalCount || filtered.length,
+      items: filtered
+    });
+
+  } catch (error: any) {
+    console.error('NTIS API Fetch Error:', error);
+    return NextResponse.json({
+      success: false,
+      error: error.message,
+      items: [],
+      totalCount: 0
+    }, { status: 500 });
   }
-}
-
-function filterList(list: typeof FALLBACK_DATA, keyword: string, dept: string) {
-  return list.filter(item => {
-    const matchKeyword = !keyword || item.ancmNm.toLowerCase().includes(keyword.toLowerCase());
-    const matchDept = !dept || dept === '전체' || (dept === '다부처' ? item.deptNm.includes('다부처') : item.deptNm === dept);
-    return matchKeyword && matchDept;
-  });
 }
