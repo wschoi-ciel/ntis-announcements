@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   Search, RotateCcw, ArrowLeft, Paperclip, 
   ExternalLink, Building2, ChevronDown, ChevronUp, 
-  Download, Share2, Check, FileSpreadsheet, ArrowUpDown
+  Download, Share2, Check, FileSpreadsheet, ArrowUpDown, AlertCircle
 } from 'lucide-react';
 
 const KEY_DEPTS = [
@@ -19,8 +19,8 @@ const ALL_DEPTS = [
 ];
 
 interface NoticeDetail {
-  id: number;
-  status: '접수중' | '접수예정' | '마감';
+  id: string | number;
+  status: string;
   title: string;
   dept: string;
   rcptBg: string;
@@ -42,7 +42,7 @@ interface NoticeDetail {
 export default function Home() {
   const [noticeStatus, setNoticeStatus] = useState<string>('전체');
   const [selectedDept, setSelectedDept] = useState<string>('전체');
-  const [timeFilter, setTimeFilter] = useState<'all' | '6m'>('all');
+  const [timeFilter, setTimeFilter] = useState<'all' | '6m'>('all'); // all: 2년치(2025~2026), 6m: 최근 6개월
   const [keyword, setKeyword] = useState<string>('');
   const [searchInput, setSearchInput] = useState<string>('');
   const [showAllDepts, setShowAllDepts] = useState<boolean>(false);
@@ -51,16 +51,18 @@ export default function Home() {
 
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage, setItemsPerPage] = useState<number>(20);
-  const [totalItems, setTotalItems] = useState<number>(77106);
+  const [totalItems, setTotalItems] = useState<number>(0);
   const [notices, setNotices] = useState<NoticeDetail[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  
-  const [selectedNotice, setSelectedNotice] = useState<NoticeDetail | null>(null);
-  const [checkedIds, setCheckedIds] = useState<number[]>([]);
+  const [apiMessage, setApiMessage] = useState<string>('');
 
-  // 서버 API로부터 실제 공고를 실시간 페이징 로드
-  const fetchLiveNotices = useCallback(async () => {
+  const [selectedNotice, setSelectedNotice] = useState<NoticeDetail | null>(null);
+  const [checkedIds, setCheckedIds] = useState<(string | number)[]>([]);
+
+  // API를 통해서만 실제 공고를 로드 (하드코딩 없음)
+  const fetchLiveAnnouncements = useCallback(async () => {
     setLoading(true);
+    setApiMessage('');
     try {
       const params = new URLSearchParams({
         page: String(currentPage),
@@ -73,32 +75,42 @@ export default function Home() {
 
       const res = await fetch(`/api/announcements?${params.toString()}`);
       const data = await res.json();
-      if (data.success && data.items) {
-        setNotices(data.items);
-        setTotalItems(data.totalCount || 77106);
+      
+      if (data.success) {
+        setNotices(data.items || []);
+        setTotalItems(data.totalCount || 0);
+        if (data.message) setApiMessage(data.message);
+      } else {
+        setNotices([]);
+        setTotalItems(0);
       }
     } catch (e) {
-      console.error(e);
+      console.error('Fetch error:', e);
+      setNotices([]);
+      setTotalItems(0);
+      setApiMessage('공고 데이터를 가져오지 못했습니다.');
     } finally {
       setLoading(false);
     }
   }, [currentPage, itemsPerPage, selectedDept, noticeStatus, timeFilter, keyword]);
 
   useEffect(() => {
-    fetchLiveNotices();
-  }, [fetchLiveNotices]);
+    fetchLiveAnnouncements();
+  }, [fetchLiveAnnouncements]);
 
-  // 상태 필터 클릭 시 1페이지부터 다시 서버 조회
+  // 상태 필터 변경 시 1페이지부터 재호출
   const handleStatusChange = (st: string) => {
     setNoticeStatus(st);
     setCurrentPage(1);
   };
 
+  // 기간 필터(2년치 / 최근 6개월) 변경 시 1페이지부터 재호출
   const handleTimeChange = (tf: 'all' | '6m') => {
     setTimeFilter(tf);
     setCurrentPage(1);
   };
 
+  // 부처 필터 변경 시 1페이지부터 재호출
   const handleDeptSelect = (dept: string) => {
     setSelectedDept(dept);
     setSelectedNotice(null);
@@ -160,7 +172,7 @@ export default function Home() {
     }
   };
 
-  const toggleCheckItem = (id: number) => {
+  const toggleCheckItem = (id: string | number) => {
     setCheckedIds((prev) => 
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
@@ -185,7 +197,7 @@ export default function Home() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `NTIS_실제공고_${selectedDept}_${noticeStatus}_p${currentPage}.csv`);
+    link.setAttribute('download', `실제_공고목록_${selectedDept}_${noticeStatus}_p${currentPage}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -193,7 +205,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-900 pb-28">
-      {/* 헤더 */}
+      {/* 1. 상단 글로벌 헤더 */}
       <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-sm">
         <div className="max-w-6xl mx-auto px-6 h-18 py-3.5 flex items-center justify-between">
           <div 
@@ -207,10 +219,10 @@ export default function Home() {
               <div className="flex items-center gap-2">
                 <span className="font-bold text-xl text-slate-900 tracking-tight">국가R&D 통합공고</span>
                 <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                  실시간 연동
+                  OpenAPI 실시간
                 </span>
               </div>
-              <p className="text-xs text-slate-500 font-normal mt-0.5">정부 부처별 공고 실시간 모니터링 시스템</p>
+              <p className="text-xs text-slate-500 font-normal mt-0.5">정부 부처별 실시간 공고 모니터링 시스템</p>
             </div>
           </div>
 
@@ -227,7 +239,7 @@ export default function Home() {
 
       <main className="max-w-6xl mx-auto px-6 pt-8 space-y-6">
         {selectedNotice ? (
-          /* ===================== 상세 정보 뷰 ===================== */
+          /* ===================== 공고 상세 화면 ===================== */
           <div className="space-y-6 max-w-4xl mx-auto animate-in fade-in duration-200">
             <button
               onClick={() => setSelectedNotice(null)}
@@ -257,13 +269,12 @@ export default function Home() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {/* 보안 세션과 필수 파라미터가 완비된 IRIS 정상 직통 링크 */}
                   <a
                     href={selectedNotice.irisDirectUrl}
                     target="_blank"
                     rel="noreferrer noopener"
-                    className="px-5 py-2.5 rounded-full bg-[#0070d2] hover:bg-[#005bb5] text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer"
-                    title="해당 공고의 IRIS 상세 페이지로 바로 이동합니다"
+                    className="px-5 py-2.5 rounded-full bg-[#0070d2] hover:bg-[#005bb5] text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition"
+                    title="해당 공고의 실제 상세 페이지로 이동합니다"
                   >
                     IRIS 바로가기 ▶
                   </a>
@@ -310,7 +321,7 @@ export default function Home() {
 
               <div className="space-y-6 pt-2 border-t border-slate-100 text-sm">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-slate-800">
-                  <div><strong className="font-bold text-slate-900">세부 사업명:</strong> {selectedNotice.projectName}</div>
+                  <div><strong className="font-bold text-slate-900">사업명:</strong> {selectedNotice.projectName}</div>
                   <div><strong className="font-bold text-slate-900">문의처:</strong> {selectedNotice.contact}</div>
                 </div>
 
@@ -323,7 +334,6 @@ export default function Home() {
                     {selectedNotice.files.map((file, idx) => (
                       <div 
                         key={idx} 
-                        onClick={() => alert(`[다운로드 안내] ${file} 파일 다운로드를 시작합니다.`)}
                         className="flex items-center justify-between p-4 rounded-xl bg-slate-50 hover:bg-white border border-slate-200 hover:border-blue-400 hover:shadow-sm transition cursor-pointer group"
                       >
                         <span className="text-sm font-bold text-slate-700 truncate pr-4 group-hover:text-blue-600">
@@ -339,7 +349,7 @@ export default function Home() {
                   <div className="flex items-center gap-2 mb-2">
                     <h4 className="font-bold text-slate-900 text-base">공고 내용</h4>
                     <span className="text-xs text-red-500 font-bold">
-                      ※ 자세한 내용은 <a href={selectedNotice.irisDirectUrl} target="_blank" rel="noreferrer noopener" className="underline text-blue-600 font-bold">IRIS 사업공고</a>에서 확인하시기 바랍니다.
+                      ※ 자세한 내용은 <a href={selectedNotice.irisDirectUrl} target="_blank" rel="noreferrer noopener" className="underline text-blue-600 font-bold">공식 사업공고</a>에서 확인하시기 바랍니다.
                     </span>
                   </div>
                   <div className="p-5 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-sm leading-relaxed min-h-[100px]">
@@ -350,7 +360,7 @@ export default function Home() {
             </div>
           </div>
         ) : (
-          /* ===================== 메인 공고 탐색 화면 ===================== */
+          /* ===================== 메인 공고 목록 화면 ===================== */
           <div className="space-y-6">
             <div className="bg-white rounded-2xl border border-slate-200 p-7 shadow-sm space-y-6">
               {/* 1. 검색 입력창 */}
@@ -371,7 +381,7 @@ export default function Home() {
                 </button>
               </form>
 
-              {/* 2. 상태 필터 & 기간 필터 (선택 즉시 1페이지부터 실시간 서버 재조회) */}
+              {/* 2. 상태 필터 & 기간 필터 (최대 2년치 2025~2026 / 최근 6개월) */}
               <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-100">
                 <div className="flex flex-wrap items-center gap-3">
                   <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl">
@@ -397,7 +407,7 @@ export default function Home() {
                         timeFilter === 'all' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'
                       }`}
                     >
-                      2026년 전체
+                      최대 2년치 (2025년 ~ 현재)
                     </button>
                     <button
                       onClick={() => handleTimeChange('6m')}
@@ -418,7 +428,7 @@ export default function Home() {
                 </button>
               </div>
 
-              {/* 3. 소관 부처 필터 (선택 즉시 해당 부처 건수로 실시간 갱신) */}
+              {/* 3. 소관 부처 필터 */}
               <div className="space-y-3 pt-1">
                 <div className="flex items-center justify-between text-sm font-bold text-slate-700">
                   <div className="flex items-center gap-1.5">
@@ -463,7 +473,7 @@ export default function Home() {
             {/* 통계 및 정렬 바 */}
             <div className="flex flex-wrap items-center justify-between gap-3 px-2">
               <span className="text-sm font-bold text-slate-600">
-                조회된 공고 <strong className="text-slate-900 text-base">{totalItems.toLocaleString()}</strong>건
+                조회된 실제 공고 <strong className="text-slate-900 text-base">{totalItems.toLocaleString()}</strong>건
                 {selectedDept !== '전체' && <span className="text-blue-600 ml-1">({selectedDept})</span>}
                 {noticeStatus !== '전체' && <span className="text-emerald-600 ml-1">[{noticeStatus}]</span>}
                 <span className="text-slate-400 font-normal ml-2">
@@ -540,8 +550,11 @@ export default function Home() {
                       </tr>
                     ) : sortedList.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="py-24 text-center text-slate-400 font-bold text-base">
-                          선택하신 조건({noticeStatus})에 해당하는 공고가 없습니다.
+                        <td colSpan={8} className="py-24 text-center text-slate-500 font-bold text-base">
+                          <div className="flex flex-col items-center justify-center gap-2">
+                            <AlertCircle className="w-8 h-8 text-slate-400" />
+                            <span>{apiMessage || '조회된 실제 공고 내역이 없습니다.'}</span>
+                          </div>
                         </td>
                       </tr>
                     ) : (
