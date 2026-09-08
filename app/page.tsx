@@ -60,7 +60,7 @@ export default function Home() {
   const [selectedNotice, setSelectedNotice] = useState<NoticeDetail | null>(null);
   const [checkedIds, setCheckedIds] = useState<(string | number)[]>([]);
 
-  // NTIS 실제 OpenAPI 호출
+  // 실제 OpenAPI 호출
   const fetchLiveAnnouncements = useCallback(async () => {
     setLoading(true);
     setApiMessage('');
@@ -79,7 +79,6 @@ export default function Home() {
       
       if (data.success) {
         setNotices(data.items || []);
-        // 부처/필터별로 달라지는 실제 모수 반영
         setTotalItems(data.totalCount || (data.items ? data.items.length : 0));
         if (data.message) setApiMessage(data.message);
       } else {
@@ -91,7 +90,7 @@ export default function Home() {
       console.error('Fetch error:', e);
       setNotices([]);
       setTotalItems(0);
-      setApiMessage('공고 데이터를 가져오지 못했습니다.');
+      setApiMessage('과제 데이터를 가져오지 못했습니다.');
     } finally {
       setLoading(false);
     }
@@ -136,7 +135,6 @@ export default function Home() {
     setCurrentPage(1);
   };
 
-  // 마감일 역순 1순위, 등록일 역순 2순위 정렬
   const sortedList = useMemo(() => {
     return [...notices].sort((a, b) => {
       if (sortOrder === 'deadline_desc') {
@@ -205,7 +203,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-900 pb-28">
-      {/* 1. 상단 헤더 */}
+      {/* 글로벌 헤더 */}
       <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-sm">
         <div className="max-w-6xl mx-auto px-6 h-18 py-3.5 flex items-center justify-between">
           <div 
@@ -239,7 +237,7 @@ export default function Home() {
 
       <main className="max-w-6xl mx-auto px-6 pt-8 space-y-6">
         {selectedNotice ? (
-          /* ===================== 공고 상세 화면 ===================== */
+          /* 상세 화면 */
           <div className="space-y-6 max-w-4xl mx-auto animate-in fade-in duration-200">
             <button
               onClick={() => setSelectedNotice(null)}
@@ -269,7 +267,7 @@ export default function Home() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {/* 해당 실제 공고명으로 정확히 일치 검색되는 IRIS 직통 링크 */}
+                  {/* 해당 과제명으로 정확히 일치 검색되는 IRIS 직통 링크 */}
                   <a
                     href={selectedNotice.irisDirectUrl}
                     target="_blank"
@@ -367,7 +365,7 @@ export default function Home() {
             </div>
           </div>
         ) : (
-          /* ===================== 메인 공고 목록 화면 ===================== */
+          /* 메인 목록 화면 */
           <div className="space-y-6">
             <div className="bg-white rounded-2xl border border-slate-200 p-7 shadow-sm space-y-6">
               {/* 1. 검색창 */}
@@ -477,7 +475,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* 통계 및 정렬 바: 부처 및 상태 선택 시 실제 건수가 동적으로 변경 */}
+            {/* 통계 바: 부처 및 상태별 실제 건수 동적 반영 */}
             <div className="flex flex-wrap items-center justify-between gap-3 px-2">
               <span className="text-sm font-bold text-slate-600">
                 조회된 실제 과제공고 <strong className="text-slate-900 text-base">{totalItems.toLocaleString()}</strong>건
