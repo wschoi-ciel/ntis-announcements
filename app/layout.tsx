@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "êµ­ê°€R&D í†µí•©ê³µê³  ëª¨ë‹ˆí„°ë§",
-  description: "NTIS ì •ë¶€ ë¶€ì²˜ë³„ ì‚¬ì—…ê³µê³  ì‹¤ì‹œê°„ ì¡°íšŒ",
+  title: "±¹°¡R&D ÅëÇÕ°ø°í ½Ã½ºÅÛ",
+  description: "NTIS Á¤ºÎ ºÎÃ³º° »ç¾÷°ø°í ½Ç½Ã°£ ¸ğ´ÏÅÍ¸µ",
   icons: {
     icon: "/icon.svg",
     shortcut: "/icon.svg",
@@ -19,7 +19,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body className="bg-[#f8fafc] text-slate-900 antialiased">{children}</body>
+      <body className="bg-[#f8fafc] text-slate-900 antialiased min-h-screen">
+        {children}
+      </body>
     </html>
   );
 }
