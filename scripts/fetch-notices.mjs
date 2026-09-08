@@ -1,4 +1,3 @@
-// scripts/fetch-notices.mjs
 import fs from 'fs';
 import path from 'path';
 
@@ -56,7 +55,7 @@ async function fetchBatch(startPos, count) {
 
   const xml = await res.text();
   if (xml.includes('접근 허용 IP가 아닙니다')) {
-    throw new Error('IP 차단 발생: 등록된 IP(1.217.108.124) 네트워크에서 실행해야 합니다.');
+    throw new Error('IP 차단: 현재 PC의 외부 공인 IP가 1.217.108.124가 아닙니다.');
   }
 
   const hitMatches = xml.match(/<HIT[\s\S]*?<\/HIT>/gi) || [];
@@ -117,37 +116,34 @@ async function fetchBatch(startPos, count) {
 async function run() {
   console.log('🚀 NTIS 전 부처 실제 공고 수집 시작...');
   const allItems = [];
-  const BATCH_SIZE = 100; // 1회당 100건씩 수집
-  const MAX_RECORDS = 1000; // 필요에 따라 1000~5000건 지정
+  const BATCH_SIZE = 100;
+  const MAX_RECORDS = 500;
 
   let startPosition = 1;
   let totalCount = 0;
 
   try {
     while (startPosition <= MAX_RECORDS) {
-      process.stdout.write(`📥 수집 진행 중: ${startPosition}번부터 ${BATCH_SIZE}건 조회... `);
+      process.stdout.write(`📥 수집 중: ${startPosition}번부터... `);
       const { items, totalHits } = await fetchBatch(startPosition, BATCH_SIZE);
       totalCount = totalHits;
       
       if (!items || items.length === 0) break;
       allItems.push(...items);
-      console.log(`성공 (${allItems.length}건 누적)`);
+      console.log(`성공 (${allItems.length}건 수집 완료)`);
 
       if (allItems.length >= totalHits || items.length < BATCH_SIZE) break;
       startPosition += BATCH_SIZE;
     }
 
-    const outputDir = path.join(process.cwd(), 'public', 'data');
-    if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
-
-    const outputPath = path.join(outputDir, 'notices.json');
+    const outputPath = path.join(process.cwd(), 'public', 'data', 'notices.json');
     fs.writeFileSync(outputPath, JSON.stringify({
       updatedAt: new Date().toISOString(),
       totalCount: totalCount || allItems.length,
       items: allItems
     }, null, 2), 'utf-8');
 
-    console.log(`✅ 수집 완료! 총 ${allItems.length}건이 ${outputPath}에 저장되었습니다.`);
+    console.log(`✅ 수집 성공! 총 ${allItems.length}건의 실제 공고가 저장되었습니다.`);
   } catch (err) {
     console.error(`❌ 수집 실패:`, err.message);
     process.exit(1);
