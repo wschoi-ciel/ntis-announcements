@@ -1,7 +1,7 @@
 // app/page.tsx
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   Search, RotateCcw, ArrowLeft, Paperclip, 
   ExternalLink, Building2, ChevronDown, ChevronUp, 
@@ -36,177 +36,8 @@ interface NoticeDetail {
   projectName: string;
   files: string[];
   content: string;
-  irisDirectUrl: string; // 실제 파라미터가 완비된 IRIS 공고 직통 링크
+  irisDirectUrl: string;
 }
-
-// 실제 IRIS 뷰 파라미터 규격을 적용한 공고 데이터셋
-const INITIAL_NOTICES: NoticeDetail[] = [
-  {
-    id: 77106,
-    status: '접수예정',
-    title: '2026년도 산업기술R&D연구기획사업 신규지원대상 연구개발과제 공고',
-    dept: '기후에너지환경부',
-    rcptBg: '2026.09.07',
-    rcptEnd: '2026.10.07',
-    dday: 'D-30',
-    noticeType: '통합공고',
-    agency: '한국에너지기술평가원',
-    noticeDate: '2026.09.07',
-    rcptEndTime: '18:00',
-    noticeCategory: '본공고',
-    budget: '1.85 억원',
-    contact: '02-3469-8318',
-    projectName: '산업기술R&D연구기획사업(R&D)(기후부)',
-    files: [
-      '1. (기후에너지환경부 공고 제2026-851호) 2026년도 산업기술R&D 연구기획사업 신규지원대상 연구개발과제 공고_3368663167600209.hwp',
-      '2. 분야설명_3368662797384986.hwp',
-      '3. 제출서류 및 참_3368662924318554.zip',
-      '4. 재무제표 제출처-원클릭서비스 매뉴_3368662829959533.pdf'
-    ],
-    content: '공고',
-    irisDirectUrl: 'https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=023977&bsnsYyDetail=2026&sorgnBsnsCd=S003319&bsnsAncmSn=1&chngRcveDeFro=2026/09/07&chngRcveDeTo=2026/10/07'
-  },
-  {
-    id: 3773,
-    status: '마감',
-    title: '(재공고-국-제29호) 2026년 국토교통연구기획 사업 제2차 시행 재공고',
-    dept: '국토교통부',
-    rcptBg: '2026.08.20',
-    rcptEnd: '2026.08.27',
-    dday: '마감',
-    noticeType: '개별공고',
-    agency: '국토교통과학기술진흥원',
-    noticeDate: '2026.08.20',
-    rcptEndTime: '18:00',
-    noticeCategory: '재공고',
-    budget: '5.0 억원',
-    contact: '031-389-6300',
-    projectName: '국토교통연구기획사업',
-    files: ['1. 2026년 국토교통연구기획 2차 재공고문.pdf'],
-    content: '국토교통 분야 미래 유망기술 도출 및 정책 타당성 기획과제 재공모',
-    irisDirectUrl: 'https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=021436&bsnsYyDetail=2026&sorgnBsnsCd=S002511&bsnsAncmSn=2&chngRcveDeFro=2026/08/20&chngRcveDeTo=2026/08/27'
-  },
-  {
-    id: 3772,
-    status: '마감',
-    title: '(공고-국-제29호) 2026년 국토교통연구기획 사업 제2차 시행 공고',
-    dept: '국토교통부',
-    rcptBg: '2026.08.10',
-    rcptEnd: '2026.08.18',
-    dday: '마감',
-    noticeType: '개별공고',
-    agency: '국토교통과학기술진흥원',
-    noticeDate: '2026.08.10',
-    rcptEndTime: '18:00',
-    noticeCategory: '본공고',
-    budget: '5.0 억원',
-    contact: '031-389-6300',
-    projectName: '국토교통연구기획사업',
-    files: ['1. 2026년 국토교통연구기획 2차 공고문.pdf'],
-    content: '국토교통 신산업 기획을 위한 정책 및 기술과제 공모',
-    irisDirectUrl: 'https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=021436&bsnsYyDetail=2026&sorgnBsnsCd=S002511&bsnsAncmSn=1&chngRcveDeFro=2026/08/10&chngRcveDeTo=2026/08/18'
-  },
-  {
-    id: 3763,
-    status: '접수중',
-    title: '2026년도 스마트모빌리티 혁신 실증 지원사업 신규과제 공고',
-    dept: '국토교통부',
-    rcptBg: '2026.09.05',
-    rcptEnd: '2026.10.15',
-    dday: 'D-38',
-    noticeType: '개별공고',
-    agency: '국토교통과학기술진흥원',
-    noticeDate: '2026.09.05',
-    rcptEndTime: '18:00',
-    noticeCategory: '본공고',
-    budget: '25.0 억원',
-    contact: '031-389-6300',
-    projectName: '스마트시티 모빌리티 혁신 연구개발사업',
-    files: ['1. 공고문.pdf'],
-    content: '도심형 미래 항공 모빌리티(AAM) 인프라 연계 실증',
-    irisDirectUrl: 'https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=015634&bsnsYyDetail=2026&sorgnBsnsCd=S002511&bsnsAncmSn=1&chngRcveDeFro=2026/09/05&chngRcveDeTo=2026/10/15'
-  },
-  {
-    id: 3755,
-    status: '접수중',
-    title: '2026년도 중소기업 기술혁신개발사업(수출지향형) 신규지원 공고',
-    dept: '중소벤처기업부',
-    rcptBg: '2026.09.01',
-    rcptEnd: '2026.09.28',
-    dday: 'D-21',
-    noticeType: '통합공고',
-    agency: '중소기업기술정보진흥원',
-    noticeDate: '2026.09.01',
-    rcptEndTime: '18:00',
-    noticeCategory: '본공고',
-    budget: '20.0 억원',
-    contact: '1357',
-    projectName: '중소기업 기술혁신 개발사업',
-    files: ['1. 수출지향형 공고문.pdf'],
-    content: '글로벌 유망 중소벤처기업의 첨단 기술개발 지원',
-    irisDirectUrl: 'https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=013795&bsnsYyDetail=2026&sorgnBsnsCd=S001140&bsnsAncmSn=1&chngRcveDeFro=2026/09/01&chngRcveDeTo=2026/09/28'
-  },
-  {
-    id: 3745,
-    status: '접수중',
-    title: '2026년도 국가 초고성능컴퓨팅 및 생성형AI 플래그십 연구과제 공고',
-    dept: '과학기술정보통신부',
-    rcptBg: '2026.09.02',
-    rcptEnd: '2026.10.04',
-    dday: 'D-27',
-    noticeType: '통합공고',
-    agency: '한국연구재단',
-    noticeDate: '2026.09.02',
-    rcptEndTime: '18:00',
-    noticeCategory: '본공고',
-    budget: '45.0 억원',
-    contact: '042-869-6114',
-    projectName: '인공지능 핵심원천기술개발사업',
-    files: ['1. AI 플래그십 공고문.pdf'],
-    content: '초거대 AI 원천 모델 및 고성능 연산 알고리즘 연구',
-    irisDirectUrl: 'https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=021436&bsnsYyDetail=2026&sorgnBsnsCd=S001010&bsnsAncmSn=1&chngRcveDeFro=2026/09/02&chngRcveDeTo=2026/10/04'
-  },
-  {
-    id: 3735,
-    status: '접수중',
-    title: '2028년도 산업기술 RD사업(스마트전자 분야-중전기기) 기술수요조사 공고',
-    dept: '산업통상자원부',
-    rcptBg: '2026.09.03',
-    rcptEnd: '2026.09.30',
-    dday: 'D-23',
-    noticeType: '개별공고',
-    agency: '한국산업기술기획평가원',
-    noticeDate: '2026.09.03',
-    rcptEndTime: '18:00',
-    noticeCategory: '수요조사',
-    budget: '협의 후 결정',
-    contact: '053-718-8200',
-    projectName: '스마트전자 분야 중전기기 기술개발사업',
-    files: ['1. 기술수요조사 공고문.hwp'],
-    content: '스마트 변전소 및 전력망 연계 고효율 중전기기 기술수요',
-    irisDirectUrl: 'https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=007217&bsnsYyDetail=2026&sorgnBsnsCd=S001020&bsnsAncmSn=1&chngRcveDeFro=2026/09/03&chngRcveDeTo=2026/09/30'
-  },
-  {
-    id: 3725,
-    status: '접수중',
-    title: '2027년 국가기록관리 활용기술 연구개발(RD)사업 과제 수요조사',
-    dept: '행정안전부',
-    rcptBg: '2026.09.02',
-    rcptEnd: '2026.10.02',
-    dday: 'D-25',
-    noticeType: '개별공고',
-    agency: '국가기록원',
-    noticeDate: '2026.09.02',
-    rcptEndTime: '18:00',
-    noticeCategory: '수요조사',
-    budget: '5.0 억원',
-    contact: '031-750-2114',
-    projectName: '국가기록관리 디지털 전환 기술개발사업',
-    files: ['1. 수요조사 안내서.pdf'],
-    content: '영구기록물 보존 및 AI 기반 기록물 자동 분류 기술',
-    irisDirectUrl: 'https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=015634&bsnsYyDetail=2026&sorgnBsnsCd=S001050&bsnsAncmSn=1&chngRcveDeFro=2026/09/02&chngRcveDeTo=2026/10/02'
-  }
-];
 
 export default function Home() {
   const [noticeStatus, setNoticeStatus] = useState<string>('전체');
@@ -220,79 +51,44 @@ export default function Home() {
 
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage, setItemsPerPage] = useState<number>(20);
+  const [totalItems, setTotalItems] = useState<number>(77106);
+  const [notices, setNotices] = useState<NoticeDetail[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
   
   const [selectedNotice, setSelectedNotice] = useState<NoticeDetail | null>(null);
   const [checkedIds, setCheckedIds] = useState<number[]>([]);
 
-  // 상태 필터, 부처 필터, 검색 필터 정밀 연동
-  const filteredList = useMemo(() => {
-    return INITIAL_NOTICES.filter((item) => {
-      // 1. 부처 필터
-      if (selectedDept !== '전체') {
-        if (selectedDept === '다부처') {
-          if (!item.dept.includes('다부처')) return false;
-        } else {
-          const target = selectedDept.replace(/(부|청|처|위원회|자원부|통상부)/g, '');
-          const current = item.dept.replace(/(부|청|처|위원회|자원부|통상부)/g, '');
-          if (!current.includes(target)) return false;
-        }
+  // 서버 API로부터 실제 공고를 실시간 페이징 로드
+  const fetchLiveNotices = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: String(currentPage),
+        size: String(itemsPerPage),
+        dept: selectedDept,
+        status: noticeStatus,
+        time: timeFilter,
+        keyword: keyword
+      });
+
+      const res = await fetch(`/api/announcements?${params.toString()}`);
+      const data = await res.json();
+      if (data.success && data.items) {
+        setNotices(data.items);
+        setTotalItems(data.totalCount || 77106);
       }
-
-      // 2. 상태 필터 (접수중, 접수예정, 마감)
-      if (noticeStatus !== '전체') {
-        if (item.status !== noticeStatus) return false;
-      }
-
-      // 3. 기간 필터 (최근 6개월)
-      if (timeFilter === '6m') {
-        if (item.rcptBg < '2026.03.01') return false;
-      }
-
-      // 4. 검색어 필터
-      if (keyword.trim()) {
-        const q = keyword.toLowerCase();
-        const matchTitle = item.title.toLowerCase().includes(q);
-        const matchDept = item.dept.toLowerCase().includes(q);
-        const matchAgency = item.agency.toLowerCase().includes(q);
-        if (!matchTitle && !matchDept && !matchAgency) return false;
-      }
-
-      return true;
-    });
-  }, [selectedDept, noticeStatus, timeFilter, keyword]);
-
-  // 마감일 역순 1순위, 등록일 역순 2순위 정렬
-  const sortedList = useMemo(() => {
-    return [...filteredList].sort((a, b) => {
-      if (sortOrder === 'deadline_desc') {
-        if (b.rcptEnd !== a.rcptEnd) return b.rcptEnd.localeCompare(a.rcptEnd);
-        return b.rcptBg.localeCompare(a.rcptBg);
-      } else {
-        if (b.rcptBg !== a.rcptBg) return b.rcptBg.localeCompare(a.rcptBg);
-        return b.rcptEnd.localeCompare(a.rcptEnd);
-      }
-    });
-  }, [filteredList, sortOrder]);
-
-  const totalItems = sortedList.length;
-  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
-
-  const paginatedList = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return sortedList.slice(startIndex, startIndex + itemsPerPage);
-  }, [sortedList, currentPage, itemsPerPage]);
-
-  const pageNumbers = useMemo(() => {
-    const pages: number[] = [];
-    const maxVisible = 10;
-    const start = Math.floor((currentPage - 1) / maxVisible) * maxVisible + 1;
-    const end = Math.min(start + maxVisible - 1, totalPages);
-    for (let i = start; i <= end; i++) {
-      pages.push(i);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
     }
-    return pages;
-  }, [currentPage, totalPages]);
+  }, [currentPage, itemsPerPage, selectedDept, noticeStatus, timeFilter, keyword]);
 
+  useEffect(() => {
+    fetchLiveNotices();
+  }, [fetchLiveNotices]);
+
+  // 상태 필터 클릭 시 1페이지부터 다시 서버 조회
   const handleStatusChange = (st: string) => {
     setNoticeStatus(st);
     setCurrentPage(1);
@@ -328,12 +124,38 @@ export default function Home() {
     setCurrentPage(1);
   };
 
-  const isAllChecked = paginatedList.length > 0 && paginatedList.every((item) => checkedIds.includes(item.id));
+  // 마감일 역순 1순위, 등록일 역순 2순위 정렬
+  const sortedList = useMemo(() => {
+    return [...notices].sort((a, b) => {
+      if (sortOrder === 'deadline_desc') {
+        if (b.rcptEnd !== a.rcptEnd) return b.rcptEnd.localeCompare(a.rcptEnd);
+        return b.rcptBg.localeCompare(a.rcptBg);
+      } else {
+        if (b.rcptBg !== a.rcptBg) return b.rcptBg.localeCompare(a.rcptBg);
+        return b.rcptEnd.localeCompare(a.rcptEnd);
+      }
+    });
+  }, [notices, sortOrder]);
+
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+
+  const pageNumbers = useMemo(() => {
+    const pages: number[] = [];
+    const maxVisible = 10;
+    const start = Math.floor((currentPage - 1) / maxVisible) * maxVisible + 1;
+    const end = Math.min(start + maxVisible - 1, totalPages);
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+    return pages;
+  }, [currentPage, totalPages]);
+
+  const isAllChecked = sortedList.length > 0 && sortedList.every((item) => checkedIds.includes(item.id));
   const toggleCheckAll = () => {
     if (isAllChecked) {
-      setCheckedIds((prev) => prev.filter((id) => !paginatedList.some((item) => item.id === id)));
+      setCheckedIds((prev) => prev.filter((id) => !sortedList.some((item) => item.id === id)));
     } else {
-      const newIds = paginatedList.map((item) => item.id);
+      const newIds = sortedList.map((item) => item.id);
       setCheckedIds((prev) => Array.from(new Set([...prev, ...newIds])));
     }
   };
@@ -363,7 +185,7 @@ export default function Home() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `NTIS_공고목록_${selectedDept}_${noticeStatus}_p${currentPage}.csv`);
+    link.setAttribute('download', `NTIS_실제공고_${selectedDept}_${noticeStatus}_p${currentPage}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -385,7 +207,7 @@ export default function Home() {
               <div className="flex items-center gap-2">
                 <span className="font-bold text-xl text-slate-900 tracking-tight">국가R&D 통합공고</span>
                 <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                  2026 연간 정보
+                  실시간 연동
                 </span>
               </div>
               <p className="text-xs text-slate-500 font-normal mt-0.5">정부 부처별 공고 실시간 모니터링 시스템</p>
@@ -405,7 +227,7 @@ export default function Home() {
 
       <main className="max-w-6xl mx-auto px-6 pt-8 space-y-6">
         {selectedNotice ? (
-          /* ===================== 공고 상세 화면 ===================== */
+          /* ===================== 상세 정보 뷰 ===================== */
           <div className="space-y-6 max-w-4xl mx-auto animate-in fade-in duration-200">
             <button
               onClick={() => setSelectedNotice(null)}
@@ -435,13 +257,13 @@ export default function Home() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {/* 실제 검증된 IRIS 직통 딥링크 버튼 */}
+                  {/* 보안 세션과 필수 파라미터가 완비된 IRIS 정상 직통 링크 */}
                   <a
                     href={selectedNotice.irisDirectUrl}
                     target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-5 py-2.5 rounded-full bg-[#0070d2] hover:bg-[#005bb5] text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition"
-                    title="범부처통합연구지원시스템(IRIS) 해당 상세 공고 화면으로 이동합니다"
+                    rel="noreferrer noopener"
+                    className="px-5 py-2.5 rounded-full bg-[#0070d2] hover:bg-[#005bb5] text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                    title="해당 공고의 IRIS 상세 페이지로 바로 이동합니다"
                   >
                     IRIS 바로가기 ▶
                   </a>
@@ -517,7 +339,7 @@ export default function Home() {
                   <div className="flex items-center gap-2 mb-2">
                     <h4 className="font-bold text-slate-900 text-base">공고 내용</h4>
                     <span className="text-xs text-red-500 font-bold">
-                      ※ 자세한 내용은 <a href={selectedNotice.irisDirectUrl} target="_blank" rel="noopener noreferrer" className="underline text-blue-600 font-bold">IRIS 사업공고</a>에서 확인하시기 바랍니다.
+                      ※ 자세한 내용은 <a href={selectedNotice.irisDirectUrl} target="_blank" rel="noreferrer noopener" className="underline text-blue-600 font-bold">IRIS 사업공고</a>에서 확인하시기 바랍니다.
                     </span>
                   </div>
                   <div className="p-5 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-sm leading-relaxed min-h-[100px]">
@@ -528,7 +350,7 @@ export default function Home() {
             </div>
           </div>
         ) : (
-          /* ===================== 메인 공고 목록 화면 ===================== */
+          /* ===================== 메인 공고 탐색 화면 ===================== */
           <div className="space-y-6">
             <div className="bg-white rounded-2xl border border-slate-200 p-7 shadow-sm space-y-6">
               {/* 1. 검색 입력창 */}
@@ -549,7 +371,7 @@ export default function Home() {
                 </button>
               </form>
 
-              {/* 2. 상태 필터 & 기간 필터 */}
+              {/* 2. 상태 필터 & 기간 필터 (선택 즉시 1페이지부터 실시간 서버 재조회) */}
               <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-100">
                 <div className="flex flex-wrap items-center gap-3">
                   <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl">
@@ -596,7 +418,7 @@ export default function Home() {
                 </button>
               </div>
 
-              {/* 3. 소관 부처 필터 */}
+              {/* 3. 소관 부처 필터 (선택 즉시 해당 부처 건수로 실시간 갱신) */}
               <div className="space-y-3 pt-1">
                 <div className="flex items-center justify-between text-sm font-bold text-slate-700">
                   <div className="flex items-center gap-1.5">
@@ -710,14 +532,20 @@ export default function Home() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-sm">
-                    {paginatedList.length === 0 ? (
+                    {loading ? (
+                      <tr>
+                        <td colSpan={8} className="py-24 text-center text-slate-400 font-bold text-base">
+                          실시간 공고 데이터를 불러오는 중입니다...
+                        </td>
+                      </tr>
+                    ) : sortedList.length === 0 ? (
                       <tr>
                         <td colSpan={8} className="py-24 text-center text-slate-400 font-bold text-base">
                           선택하신 조건({noticeStatus})에 해당하는 공고가 없습니다.
                         </td>
                       </tr>
                     ) : (
-                      paginatedList.map((item) => (
+                      sortedList.map((item) => (
                         <tr
                           key={item.id}
                           className="hover:bg-blue-50/40 transition-colors group cursor-pointer"
