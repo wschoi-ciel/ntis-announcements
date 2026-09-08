@@ -1,699 +1,133 @@
-// app/page.tsx
-'use client';
+// app/api/announcements/route.ts
+import { NextRequest, NextResponse } from 'next/server';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { 
-  Search, RotateCcw, ArrowLeft, Paperclip, 
-  ExternalLink, Building2, ChevronDown, ChevronUp, 
-  Download, Share2, Check, FileSpreadsheet, ArrowUpDown
-} from 'lucide-react';
+function calculateDday(endDateStr?: string) {
+  if (!endDateStr) return '-';
+  const clean = String(endDateStr).replace(/[^0-9]/g, '');
+  if (clean.length < 8) return '-';
 
-const KEY_DEPTS = [
-  '전체', '다부처', '중소벤처기업부', '과학기술정보통신부', '산업통상자원부', '국토교통부', '행정안전부'
-];
+  const year = parseInt(clean.substring(0, 4), 10);
+  const month = parseInt(clean.substring(4, 6), 10) - 1;
+  const day = parseInt(clean.substring(6, 8), 10);
 
-const ALL_DEPTS = [
-  '전체', '다부처', '중소벤처기업부', '과학기술정보통신부', '산업통상자원부', '국토교통부', '행정안전부',
-  '기후에너지환경부', '보건복지부', '교육부', '농림축산식품부', '해양수산부', '방위사업청', 
-  '소방청', '식품의약품안전처', '기상청', '농촌진흥청', '산림청', '질병관리청', '특허청', '기타'
-];
+  const targetDate = new Date(year, month, day);
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
 
-interface NoticeDetail {
-  id: number | string;
-  status: string;
-  title: string;
-  dept: string;
-  rcptBg: string;
-  rcptEnd: string;
-  dday: string;
-  noticeType: string;
-  agency: string;
-  noticeDate: string;
-  rcptEndTime: string;
-  noticeCategory: string;
-  budget: string;
-  contact: string;
-  projectName: string;
-  files: string[];
-  content: string;
+  const diffDays = Math.ceil((targetDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return '마감';
+  if (diffDays === 0) return 'D-Day';
+  return `D-${diffDays}`;
 }
 
-export default function Home() {
-  const [noticeStatus, setNoticeStatus] = useState('전체');
-  const [selectedDept, setSelectedDept] = useState('전체');
-  const [timeFilter, setTimeFilter] = useState<'all' | '6m'>('all');
-  const [keyword, setKeyword] = useState('');
-  const [searchInput, setSearchInput] = useState('');
-  const [showAllDepts, setShowAllDepts] = useState(false);
-  
-  // 정렬 기준 (마감일 역순 1순위, 등록일 역순 2순위)
-  const [sortOrder, setSortOrder] = useState<'deadline_desc' | 'recent_desc'>('deadline_desc');
-  const [copied, setCopied] = useState(false);
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const page = parseInt(searchParams.get('page') || '1', 10);
+  const size = parseInt(searchParams.get('size') || '20', 10);
+  const dept = searchParams.get('dept') || '전체';
+  const status = searchParams.get('status') || '전체';
+  const time = searchParams.get('time') || 'all';
+  const keyword = searchParams.get('keyword') || '';
 
-  // 서버 사이드 페이징 State
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(20);
-  const [totalItems, setTotalItems] = useState(77106);
-  const [notices, setNotices] = useState<NoticeDetail[]>([]);
-  const [loading, setLoading] = useState(false);
-  
-  const [selectedNotice, setSelectedNotice] = useState<NoticeDetail | null>(null);
-  const [checkedIds, setCheckedIds] = useState<(string | number)[]>([]);
-
-  // 서버에서 실시간 데이터 로드 (부처 선택 시 7천여 건 / 각 부처별 건수 실시간 갱신)
-  const fetchNotices = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        page: String(currentPage),
-        size: String(itemsPerPage),
-        dept: selectedDept,
-        status: noticeStatus,
-        keyword: keyword
-      });
-
-      const res = await fetch(`/api/announcements?${params.toString()}`);
-      const data = await res.json();
-      if (data.success && data.items) {
-        setNotices(data.items);
-        setTotalItems(data.totalCount || 77106);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  }, [currentPage, itemsPerPage, selectedDept, noticeStatus, keyword]);
-
-  useEffect(() => {
-    fetchNotices();
-  }, [fetchNotices]);
-
-  // 부처 선택 시 1페이지부터 다시 서버 데이터 호출
-  const handleDeptSelect = (dept: string) => {
-    setSelectedDept(dept);
-    setSelectedNotice(null);
-    setCurrentPage(1);
+  const deptCountMap: Record<string, number> = {
+    '전체': 77106,
+    '국토교통부': 3773,
+    '중소벤처기업부': 12450,
+    '과학기술정보통신부': 18920,
+    '산업통상자원부': 21400,
+    '행정안전부': 2840,
+    '다부처': 1580,
   };
 
-  const handleReset = () => {
-    setNoticeStatus('전체');
-    setSelectedDept('전체');
-    setTimeFilter('all');
-    setKeyword('');
-    setSearchInput('');
-    setSortOrder('deadline_desc');
-    setSelectedNotice(null);
-    setCheckedIds([]);
-    setCurrentPage(1);
-  };
+  const baseTotal = deptCountMap[dept] || 3000;
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setKeyword(searchInput.trim());
-    setSelectedNotice(null);
-    setCurrentPage(1);
-  };
+  // 전체 가상 공고 데이터셋 생성
+  const allNotices = Array.from({ length: 120 }, (_, i) => {
+    const serialNumber = baseTotal - i;
+    const actualDept = dept === '전체' 
+      ? ['국토교통부', '중소벤처기업부', '과학기술정보통신부', '산업통상자원부', '행정안전부'][i % 5]
+      : dept;
 
-  // IRIS 스타일 깨짐 없는 공식 정상 랜딩 링크
-  const getSafeIrisUrl = (title: string) => {
-    // IRIS 표준 게이트웨이 호출 규격 (세션 및 CSS 깨짐 방지 파라미터 적용)
-    const clean = title.replace(/\([^)]*\)/g, '').trim();
-    return `https://www.iris.go.kr/contents/retrieveBsnsAncmList.do?searchKeyword=${encodeURIComponent(clean || title)}`;
-  };
+    // 접수중, 접수예정, 마감 상태를 규칙적으로 배치
+    let itemStatus: '접수중' | '접수예정' | '마감';
+    let month: number;
+    let endDay: number;
+    let bgDay: number;
 
-  // 마감일 역순 우선, 등록일 역순 정렬
-  const sortedList = useMemo(() => {
-    return [...notices].sort((a, b) => {
-      if (sortOrder === 'deadline_desc') {
-        if (b.rcptEnd !== a.rcptEnd) return b.rcptEnd.localeCompare(a.rcptEnd);
-        return b.rcptBg.localeCompare(a.rcptBg);
-      } else {
-        if (b.rcptBg !== a.rcptBg) return b.rcptBg.localeCompare(a.rcptBg);
-        return b.rcptEnd.localeCompare(a.rcptEnd);
-      }
-    });
-  }, [notices, sortOrder]);
-
-  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
-
-  const pageNumbers = useMemo(() => {
-    const pages = [];
-    const maxVisible = 10;
-    let start = Math.floor((currentPage - 1) / maxVisible) * maxVisible + 1;
-    let end = Math.min(start + maxVisible - 1, totalPages);
-    for (let i = start; i <= end; i++) {
-      pages.push(i);
-    }
-    return pages;
-  }, [currentPage, totalPages]);
-
-  const isAllChecked = sortedList.length > 0 && sortedList.every(item => checkedIds.includes(item.id));
-  const toggleCheckAll = () => {
-    if (isAllChecked) {
-      setCheckedIds(prev => prev.filter(id => !sortedList.some(item => item.id === id)));
+    if (i % 3 === 0) {
+      itemStatus = '접수중';
+      month = 10;
+      bgDay = 5 + (i % 10);
+      endDay = 25 + (i % 5);
+    } else if (i % 3 === 1) {
+      itemStatus = '접수예정';
+      month = 11;
+      bgDay = 10 + (i % 10);
+      endDay = 28;
     } else {
-      const newIds = sortedList.map(item => item.id);
-      setCheckedIds(prev => Array.from(new Set([...prev, ...newIds])));
+      itemStatus = '마감';
+      month = 3 + (i % 5);
+      bgDay = 2;
+      endDay = 20;
     }
-  };
 
-  const toggleCheckItem = (id: string | number) => {
-    setCheckedIds(prev => 
-      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    const mStr = String(month).padStart(2, '0');
+    const bgStr = String(bgDay).padStart(2, '0');
+    const endStr = String(endDay).padStart(2, '0');
+    const rcptBg = `2026.${mStr}.${bgStr}`;
+    const rcptEnd = `2026.${mStr}.${endStr}`;
+    const dday = itemStatus === '마감' ? '마감' : calculateDday(`2026${mStr}${endStr}`);
+
+    return {
+      id: serialNumber,
+      status: itemStatus,
+      title: `(공고-제2026-${serialNumber}호) ${actualDept} 2026년도 국가R&D 전략기술개발 및 실증과제 공고`,
+      dept: actualDept,
+      rcptBg,
+      rcptEnd,
+      dday,
+      noticeType: i % 2 === 0 ? '통합공고' : '개별공고',
+      agency: `${actualDept} 전문관리기관`,
+      noticeDate: rcptBg,
+      rcptEndTime: '18:00',
+      noticeCategory: i % 4 === 0 ? '수요조사' : '본공고',
+      budget: `${(i * 0.4 + 2.5).toFixed(1)} 억원`,
+      contact: '042-869-1114',
+      projectName: `${actualDept} 미래핵심 연구개발사업`,
+      files: [`1. 2026년도_${actualDept}_공고문_${serialNumber}.pdf`],
+      content: '본 공고의 세부 신청자격, 지원내용 및 서식은 범부처통합연구지원시스템(IRIS) 사업공고를 참조하시기 바랍니다.'
+    };
+  });
+
+  // 상태 필터 적용
+  let filtered = allNotices;
+  if (status !== '전체') {
+    filtered = filtered.filter(item => item.status === status);
+  }
+
+  // 기간 필터 적용
+  if (time === '6m') {
+    filtered = filtered.filter(item => item.rcptBg >= '2026.03.01');
+  }
+
+  // 검색어 필터 적용
+  if (keyword.trim()) {
+    const q = keyword.toLowerCase();
+    filtered = filtered.filter(item => 
+      item.title.toLowerCase().includes(q) || 
+      item.dept.toLowerCase().includes(q) ||
+      item.agency.toLowerCase().includes(q)
     );
-  };
+  }
 
-  const handleExportCsv = () => {
-    if (sortedList.length === 0) return;
-    const header = ['순번', '상태', '공고명', '소관부처', '전담기관', '접수시작일', '접수마감일', 'D-day', '지원규모'];
-    const rows = sortedList.map(n => [
-      n.id,
-      n.status,
-      `"${n.title.replace(/"/g, '""')}"`,
-      n.dept,
-      n.agency,
-      n.rcptBg,
-      n.rcptEnd,
-      n.dday,
-      `"${n.budget}"`
-    ]);
-    const csvContent = '\uFEFF' + [header.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `NTIS_공고목록_${selectedDept}_p${currentPage}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+  // 페이징 계산
+  const totalCount = filtered.length;
+  const startIndex = (page - 1) * size;
+  const paginated = filtered.slice(startIndex, startIndex + size);
 
-  return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-900 pb-28">
-      {/* 헤더 */}
-      <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-sm">
-        <div className="max-w-6xl mx-auto px-6 h-18 py-3.5 flex items-center justify-between">
-          <div 
-            onClick={() => setSelectedNotice(null)}
-            className="flex items-center gap-3 cursor-pointer group"
-          >
-            <div className="w-10 h-10 rounded-xl bg-[#004b93] flex items-center justify-center text-white font-bold text-lg shadow-sm">
-              <span className="text-[#ff6b00] mr-0.5">•</span>N
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-xl text-slate-900 tracking-tight">국가R&D 통합공고</span>
-                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                  실시간 연동
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 font-normal mt-0.5">정부 부처별 공고 실시간 모니터링 시스템</p>
-            </div>
-          </div>
-
-          {selectedNotice && (
-            <button
-              onClick={() => setSelectedNotice(null)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 transition"
-            >
-              <ArrowLeft className="w-4 h-4" /> 목록으로
-            </button>
-          )}
-        </div>
-      </header>
-
-      <main className="max-w-6xl mx-auto px-6 pt-8 space-y-6">
-        {selectedNotice ? (
-          /* ===================== 공고 상세 화면 ===================== */
-          <div className="space-y-6 max-w-4xl mx-auto animate-in fade-in duration-200">
-            <button
-              onClick={() => setSelectedNotice(null)}
-              className="inline-flex items-center gap-1.5 text-sm font-bold text-slate-600 hover:text-blue-600 transition"
-            >
-              <ArrowLeft className="w-4 h-4" /> 공고 목록으로 돌아가기
-            </button>
-
-            <div className="bg-white rounded-2xl border border-slate-200 p-8 sm:p-10 shadow-sm space-y-7">
-              {/* 상단 태그 및 IRIS 바로가기 버튼 */}
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="px-3.5 py-1.5 rounded-full text-sm font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                    {selectedNotice.dept}
-                  </span>
-                  <span className="px-3.5 py-1.5 rounded-full text-sm font-bold bg-slate-100 text-slate-700">
-                    {selectedNotice.noticeType}
-                  </span>
-                  <span className={`px-3.5 py-1.5 rounded-full text-sm font-bold ${
-                    selectedNotice.status === '접수중' 
-                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
-                      : selectedNotice.status === '접수예정'
-                      ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                      : 'bg-slate-100 text-slate-600'
-                  }`}>
-                    {selectedNotice.status}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {/* 깨짐 없이 정상 렌더링되는 IRIS 직통 연결 버튼 */}
-                  <a
-                    href={getSafeIrisUrl(selectedNotice.title)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-5 py-2.5 rounded-full bg-[#0070d2] hover:bg-[#005bb5] text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition"
-                    title="범부처통합연구지원시스템(IRIS) 공식 공고 페이지로 이동합니다"
-                  >
-                    IRIS 바로가기 ▶
-                  </a>
-
-                  <span className="text-sm font-bold text-rose-600 bg-rose-50 border border-rose-200 px-3.5 py-1.5 rounded-full whitespace-nowrap">
-                    {selectedNotice.dday}
-                  </span>
-                  <button 
-                    onClick={() => {
-                      navigator.clipboard.writeText(window.location.href);
-                      setCopied(true);
-                      setTimeout(() => setCopied(false), 2000);
-                    }}
-                    className="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition"
-                    title="링크 복사"
-                  >
-                    {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Share2 className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 leading-snug">
-                {selectedNotice.title}
-              </h2>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-6 rounded-xl bg-slate-50 border border-slate-100 text-sm">
-                <div>
-                  <span className="text-xs font-bold text-slate-500 block mb-1">지원 규모</span>
-                  <span className="font-bold text-base text-blue-600">{selectedNotice.budget}</span>
-                </div>
-                <div>
-                  <span className="text-xs font-bold text-slate-500 block mb-1">공고 기관</span>
-                  <span className="font-bold text-slate-800">{selectedNotice.agency}</span>
-                </div>
-                <div>
-                  <span className="text-xs font-bold text-slate-500 block mb-1">접수 기간</span>
-                  <span className="font-bold text-slate-800">{selectedNotice.rcptBg} ~ {selectedNotice.rcptEnd}</span>
-                </div>
-                <div>
-                  <span className="text-xs font-bold text-slate-500 block mb-1">접수 마감 시간</span>
-                  <span className="font-bold text-slate-800">{selectedNotice.rcptEndTime}</span>
-                </div>
-              </div>
-
-              {/* 세부 사업 및 서류 안내 */}
-              <div className="space-y-6 pt-2 border-t border-slate-100 text-sm">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-slate-800">
-                  <div><strong className="font-bold text-slate-900">세부 사업명:</strong> {selectedNotice.projectName}</div>
-                  <div><strong className="font-bold text-slate-900">문의처:</strong> {selectedNotice.contact}</div>
-                </div>
-
-                <div>
-                  <h4 className="font-bold text-slate-900 mb-3 flex items-center gap-1.5 text-base">
-                    <Paperclip className="w-4 h-4 text-slate-500" />
-                    첨부파일 ({selectedNotice.files.length})
-                  </h4>
-                  <div className="grid grid-cols-1 gap-2.5">
-                    {selectedNotice.files.map((file, idx) => (
-                      <div 
-                        key={idx} 
-                        onClick={() => alert(`[다운로드 안내] ${file} 파일 다운로드를 시작합니다.`)}
-                        className="flex items-center justify-between p-4 rounded-xl bg-slate-50 hover:bg-white border border-slate-200 hover:border-blue-400 hover:shadow-sm transition cursor-pointer group"
-                      >
-                        <span className="text-sm font-bold text-slate-700 truncate pr-4 group-hover:text-blue-600">
-                          {file}
-                        </span>
-                        <Download className="w-4 h-4 text-slate-400 group-hover:text-blue-600 flex-shrink-0" />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="font-bold text-slate-900 mb-2 text-base">공고 내용</h4>
-                  <div className="p-5 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-sm leading-relaxed min-h-[100px]">
-                    {selectedNotice.content}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          /* ===================== 메인 공고 목록 화면 ===================== */
-          <div className="space-y-6">
-            <div className="bg-white rounded-2xl border border-slate-200 p-7 shadow-sm space-y-6">
-              {/* 1. 검색 입력창 */}
-              <form onSubmit={handleSearch} className="relative flex items-center">
-                <Search className="absolute left-4 w-5 h-5 text-slate-400" />
-                <input
-                  type="text"
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="공고명, 부처명, 전문기관, 사업 키워드 검색"
-                  className="w-full pl-12 pr-28 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-base text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition font-bold"
-                />
-                <button
-                  type="submit"
-                  className="absolute right-2 px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm transition shadow-sm"
-                >
-                  검색
-                </button>
-              </form>
-
-              {/* 2. 상태 필터 & 기간 필터 */}
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-100">
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl">
-                    {['전체', '접수중', '접수예정', '마감'].map((st) => (
-                      <button
-                        key={st}
-                        onClick={() => {
-                          setNoticeStatus(st);
-                          setCurrentPage(1);
-                        }}
-                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                          noticeStatus === st
-                            ? 'bg-white text-blue-600 shadow-sm'
-                            : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                      >
-                        {st}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl text-xs font-bold">
-                    <button
-                      onClick={() => {
-                        setTimeFilter('all');
-                        setCurrentPage(1);
-                      }}
-                      className={`px-3 py-2 rounded-lg transition-all ${
-                        timeFilter === 'all' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'
-                      }`}
-                    >
-                      2026년 전체
-                    </button>
-                    <button
-                      onClick={() => {
-                        setTimeFilter('6m');
-                        setCurrentPage(1);
-                      }}
-                      className={`px-3 py-2 rounded-lg transition-all ${
-                        timeFilter === '6m' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'
-                      }`}
-                    >
-                      최근 6개월
-                    </button>
-                  </div>
-                </div>
-
-                <button
-                  onClick={handleReset}
-                  className="inline-flex items-center gap-1.5 text-sm font-bold text-slate-500 hover:text-slate-800 transition"
-                >
-                  <RotateCcw className="w-4 h-4" /> 조건 초기화
-                </button>
-              </div>
-
-              {/* 3. 소관 부처 필터 (선택 즉시 서버에서 수천 건 재조회) */}
-              <div className="space-y-3 pt-1">
-                <div className="flex items-center justify-between text-sm font-bold text-slate-700">
-                  <div className="flex items-center gap-1.5">
-                    <Building2 className="w-4 h-4 text-slate-500" />
-                    <span>소관 부처 선택</span>
-                    {selectedDept !== '전체' && (
-                      <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full ml-1">
-                        선택: {selectedDept}
-                      </span>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => setShowAllDepts(!showAllDepts)}
-                    className="inline-flex items-center gap-1 text-blue-600 hover:underline text-xs font-bold"
-                  >
-                    {showAllDepts ? '5대 주요 부처만 보기' : '전체 부처 펼치기'} 
-                    {showAllDepts ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                  </button>
-                </div>
-
-                <div className="flex flex-wrap gap-2.5">
-                  {(showAllDepts ? ALL_DEPTS : KEY_DEPTS).map((dept) => {
-                    const isSelected = selectedDept === dept;
-                    return (
-                      <button
-                        key={dept}
-                        onClick={() => handleDeptSelect(dept)}
-                        className={`px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm ${
-                          isSelected
-                            ? 'bg-slate-900 text-white shadow-md'
-                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                        }`}
-                      >
-                        {dept}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {/* 통계 및 정렬 바 */}
-            <div className="flex flex-wrap items-center justify-between gap-3 px-2">
-              <span className="text-sm font-bold text-slate-600">
-                조회된 공고 <strong className="text-slate-900 text-base">{totalItems.toLocaleString()}</strong>건
-                {selectedDept !== '전체' && <span className="text-blue-600 ml-1">({selectedDept})</span>}
-                <span className="text-slate-400 font-normal ml-2">
-                  (전체 {totalPages.toLocaleString()}페이지 중 {currentPage}페이지)
-                </span>
-              </span>
-
-              <div className="flex items-center gap-2 text-xs font-bold">
-                <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg px-2 py-1 shadow-sm">
-                  <span className="text-slate-500 font-normal">표시 개수:</span>
-                  <select
-                    value={itemsPerPage}
-                    onChange={(e) => {
-                      setItemsPerPage(Number(e.target.value));
-                      setCurrentPage(1);
-                    }}
-                    className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer"
-                  >
-                    <option value={10}>10 개</option>
-                    <option value={20}>20 개</option>
-                    <option value={50}>50 개</option>
-                    <option value={100}>100 개</option>
-                  </select>
-                </div>
-
-                {/* 정렬 토글: 마감일 역순 우선 */}
-                <button
-                  onClick={() => setSortOrder(prev => prev === 'deadline_desc' ? 'recent_desc' : 'deadline_desc')}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition shadow-sm"
-                >
-                  <ArrowUpDown className="w-3.5 h-3.5 text-blue-600" />
-                  <span>{sortOrder === 'deadline_desc' ? '마감일 역순 (우선)' : '등록일 역순'}</span>
-                </button>
-
-                <button
-                  onClick={handleExportCsv}
-                  className="inline-flex items-center gap-1 px-3.5 py-2 rounded-lg bg-white border border-slate-200 text-emerald-700 hover:bg-emerald-50 transition shadow-sm"
-                  title="현재 목록 엑셀(CSV) 저장"
-                >
-                  <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-                  리스트 다운로드
-                </button>
-              </div>
-            </div>
-
-            {/* 공고 테이블 */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse table-fixed">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold text-sm">
-                      <th className="py-4 px-4 w-12 text-center">
-                        <input
-                          type="checkbox"
-                          checked={isAllChecked}
-                          onChange={toggleCheckAll}
-                          className="w-4 h-4 rounded text-blue-600 cursor-pointer"
-                        />
-                      </th>
-                      <th className="py-4 px-3 w-16 text-center">순번</th>
-                      <th className="py-4 px-3 w-24 text-center">현황</th>
-                      <th className="py-4 px-6">공고명</th>
-                      <th className="py-4 px-4 w-36 text-center">부처명</th>
-                      <th className="py-4 px-4 w-32 text-center">접수일</th>
-                      <th className="py-4 px-4 w-32 text-center text-blue-700">마감일 ⬇</th>
-                      <th className="py-4 px-4 w-36 text-center">D-day</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-sm">
-                    {loading ? (
-                      <tr>
-                        <td colSpan={8} className="py-24 text-center text-slate-400 font-bold text-base">
-                          공고 데이터를 불러오는 중입니다...
-                        </td>
-                      </tr>
-                    ) : sortedList.length === 0 ? (
-                      <tr>
-                        <td colSpan={8} className="py-24 text-center text-slate-400 font-bold text-base">
-                          조회된 공고 내역이 없습니다.
-                        </td>
-                      </tr>
-                    ) : (
-                      sortedList.map((item) => (
-                        <tr
-                          key={item.id}
-                          className="hover:bg-blue-50/40 transition-colors group cursor-pointer"
-                        >
-                          <td 
-                            className="py-4 px-4 text-center"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={checkedIds.includes(item.id)}
-                              onChange={() => toggleCheckItem(item.id)}
-                              className="w-4 h-4 rounded text-blue-600 cursor-pointer"
-                            />
-                          </td>
-
-                          <td 
-                            className="py-4 px-3 text-center text-slate-500 font-medium whitespace-nowrap"
-                            onClick={() => setSelectedNotice(item)}
-                          >
-                            {item.id}
-                          </td>
-
-                          <td 
-                            className="py-4 px-3 text-center whitespace-nowrap"
-                            onClick={() => setSelectedNotice(item)}
-                          >
-                            <span className={`inline-block px-3 py-1 rounded-md text-xs font-bold whitespace-nowrap ${
-                              item.status === '접수중'
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                : item.status === '접수예정'
-                                ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                                : 'bg-slate-100 text-slate-500'
-                            }`}>
-                              {item.status}
-                            </span>
-                          </td>
-
-                          <td 
-                            className="py-4 px-6 font-bold text-slate-900 group-hover:text-blue-600 transition-colors"
-                            onClick={() => setSelectedNotice(item)}
-                          >
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="text-[15px] leading-snug line-clamp-1">{item.title}</span>
-                              <ExternalLink className="w-4 h-4 text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-                            </div>
-                          </td>
-
-                          <td 
-                            className="py-4 px-4 text-center whitespace-nowrap"
-                            onClick={() => setSelectedNotice(item)}
-                          >
-                            <span className="inline-block px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 font-bold text-xs whitespace-nowrap">
-                              {item.dept}
-                            </span>
-                          </td>
-
-                          <td 
-                            className="py-4 px-4 text-center text-slate-600 font-medium whitespace-nowrap text-xs sm:text-sm"
-                            onClick={() => setSelectedNotice(item)}
-                          >
-                            {item.rcptBg}
-                          </td>
-
-                          <td 
-                            className="py-4 px-4 text-center text-slate-800 font-bold whitespace-nowrap text-xs sm:text-sm"
-                            onClick={() => setSelectedNotice(item)}
-                          >
-                            {item.rcptEnd}
-                          </td>
-
-                          <td 
-                            className="py-4 px-4 text-center whitespace-nowrap"
-                            onClick={() => setSelectedNotice(item)}
-                          >
-                            <span className={`inline-flex items-center justify-center min-w-[64px] font-bold text-xs sm:text-sm px-3 py-1 rounded-full whitespace-nowrap ${
-                              item.dday === '마감'
-                                ? 'text-slate-500 bg-slate-100 border border-slate-200'
-                                : 'text-rose-600 bg-rose-50 border border-rose-200'
-                            }`}>
-                              {item.dday}
-                            </span>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* 페이지네이션 바 */}
-              {totalPages > 1 && (
-                <div className="p-5 bg-white border-t border-slate-200 flex items-center justify-center gap-1.5 text-xs sm:text-sm select-none">
-                  <button
-                    onClick={() => setCurrentPage(1)}
-                    disabled={currentPage === 1}
-                    className="px-3 py-1.5 border border-slate-200 rounded text-slate-600 hover:bg-slate-50 disabled:opacity-40 font-medium"
-                  >
-                    처음
-                  </button>
-
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    disabled={currentPage === 1}
-                    className="px-3 py-1.5 border border-slate-200 rounded text-slate-600 hover:bg-slate-50 disabled:opacity-40 font-medium"
-                  >
-                    이전
-                  </button>
-
-                  {pageNumbers.map(page => (
-                    <button
-                      key={page}
-                      onClick={() => setCurrentPage(page)}
-                      className={`min-w-[34px] h-[34px] px-2 rounded font-bold transition-colors ${
-                        currentPage === page
-                          ? 'bg-[#1e293b] text-white'
-                          : 'border border-slate-200 text-slate-700 hover:bg-slate-100 bg-white'
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  ))}
-
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    disabled={currentPage === totalPages}
-                    className="px-3 py-1.5 border border-slate-200 rounded text-slate-600 hover:bg-slate-50 disabled:opacity-40 font-medium"
-                  >
-                    다음
-                  </button>
-
-                  <button
-                    onClick={() => setCurrentPage(totalPages)}
-                    disabled={currentPage === totalPages}
-                    className="px-3 py-1.5 border border-slate-200 rounded text-slate-600 hover:bg-slate-50 disabled:opacity-40 font-medium"
-                  >
-                    끝
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </main>
-    </div>
-  );
+  return NextResponse.json({
+    success: true,
+    items: paginated,
+    totalCount: totalCount
+  });
 }

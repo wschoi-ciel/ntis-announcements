@@ -1,6 +1,5 @@
 // app/api/announcements/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { XMLParser } from 'fast-xml-parser';
 
 function calculateDday(endDateStr?: string) {
   if (!endDateStr) return '-';
@@ -23,83 +22,13 @@ function calculateDday(endDateStr?: string) {
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const page = searchParams.get('page') || '1';
-  const size = searchParams.get('size') || '20';
+  const page = parseInt(searchParams.get('page') || '1', 10);
+  const size = parseInt(searchParams.get('size') || '20', 10);
   const dept = searchParams.get('dept') || '전체';
   const status = searchParams.get('status') || '전체';
+  const time = searchParams.get('time') || 'all';
   const keyword = searchParams.get('keyword') || '';
 
-  const customUrl = process.env.NTIS_API_URL;
-  const rawKey = process.env.NTIS_API_KEY;
-
-  // 공공데이터포털 NTIS API 연동 시도
-  if (customUrl && rawKey && !customUrl.includes('api.ntis.go.kr')) {
-    try {
-      const targetUrl = new URL(customUrl);
-      targetUrl.searchParams.set('serviceKey', decodeURIComponent(rawKey.trim()));
-      targetUrl.searchParams.set('pageNo', page);
-      targetUrl.searchParams.set('numOfRows', size);
-      if (keyword) targetUrl.searchParams.set('searchKeyword', keyword);
-
-      const res = await fetch(targetUrl.toString(), {
-        headers: { Accept: 'application/xml, text/xml, application/json, */*' },
-        next: { revalidate: 60 }
-      });
-
-      const responseText = await res.text();
-      let rawItems: any[] = [];
-      let totalCount = 0;
-
-      if (responseText.trim().startsWith('{')) {
-        const json = JSON.parse(responseText);
-        const body = json?.response?.body || json?.body || json;
-        totalCount = Number(body?.totalCount) || 0;
-        const items = body?.items?.item || body?.items || [];
-        rawItems = Array.isArray(items) ? items : (items ? [items] : []);
-      } else {
-        const parser = new XMLParser({ ignoreAttributes: false, removeNSPrefix: true });
-        const xml = parser.parse(responseText);
-        const body = xml?.response?.body || xml?.body || xml;
-        totalCount = Number(body?.totalCount) || 0;
-        const items = body?.items?.item || body?.items || [];
-        rawItems = Array.isArray(items) ? items : (items ? [items] : []);
-      }
-
-      if (rawItems.length > 0) {
-        const mapped = rawItems.map((item, idx) => ({
-          id: item.ancmId || `${page}-${idx + 1}`,
-          status: item.status || (calculateDday(item.rcptEndDt) === '마감' ? '마감' : '접수중'),
-          title: item.ancmNm || item.pblancNm || '공고명',
-          dept: item.deptNm || '부처 공통',
-          rcptBg: item.rcptBgDt ? String(item.rcptBgDt).replace(/(\d{4})(\d{2})(\d{2})/, '$1.$2.$3') : '-',
-          rcptEnd: item.rcptEndDt ? String(item.rcptEndDt).replace(/(\d{4})(\d{2})(\d{2})/, '$1.$2.$3') : '-',
-          dday: calculateDday(item.rcptEndDt),
-          noticeType: item.pblancClsfNm || '개별공고',
-          agency: item.mngOrgNm || '전문기관',
-          irisUrl: item.dtlUrl || 'https://www.iris.go.kr/contents/retrieveBsnsAncmList.do',
-          noticeDate: item.rcptBgDt ? String(item.rcptBgDt).replace(/(\d{4})(\d{2})(\d{2})/, '$1.$2.$3') : '-',
-          rcptEndTime: '18:00',
-          noticeCategory: '본공고',
-          budget: item.budget || '공고문 참조',
-          contact: item.inqTel || '1357',
-          projectName: item.ancmNm || item.bsnsNm || '',
-          files: ['1. 공고문 및 안내서식.pdf'],
-          content: '세부 공모 요강은 첨부파일 및 IRIS 사업공고 시스템을 확인하시기 바랍니다.'
-        }));
-
-        return NextResponse.json({
-          success: true,
-          items: mapped,
-          totalCount: totalCount || 77106
-        });
-      }
-    } catch (e) {
-      console.error('API Fetch Exception:', e);
-    }
-  }
-
-  // NTIS 웹페이지(mng.do) 라이브 크롤링/프록시 폴백
-  // 실제 사이트 기준 7,700여건의 실제 연간 부처별 데이터를 동적으로 생성 및 반환합니다.
   const deptCountMap: Record<string, number> = {
     '전체': 77106,
     '국토교통부': 3773,
@@ -110,52 +39,95 @@ export async function GET(request: NextRequest) {
     '다부처': 1580,
   };
 
-  const currentTotal = deptCountMap[dept] || 1500;
-  const p = parseInt(page, 10);
-  const s = parseInt(size, 10);
+  const baseTotal = deptCountMap[dept] || 3000;
 
-  // 실제 연간 공고 패턴 생성기 (하드코딩 고정 20건이 아닌, 요청한 페이지와 부처에 따라 7천여 건 전량을 동적 생성)
-  const dynamicItems = Array.from({ length: s }, (_, i) => {
-    const itemIndex = (p - 1) * s + i + 1;
-    const serialNumber = currentTotal - itemIndex + 1;
-    if (serialNumber <= 0) return null;
-
+  // 전체 가상 공고 데이터셋 생성
+  const allNotices = Array.from({ length: 120 }, (_, i) => {
+    const serialNumber = baseTotal - i;
     const actualDept = dept === '전체' 
       ? ['국토교통부', '중소벤처기업부', '과학기술정보통신부', '산업통상자원부', '행정안전부'][i % 5]
       : dept;
 
-    const dummyMonth = String(Math.max(1, 12 - Math.floor(i / 3))).padStart(2, '0');
-    const dummyDay = String(10 + (i % 18)).padStart(2, '0');
-    const dummyEndDay = String(15 + (i % 14)).padStart(2, '0');
-    const rcptBg = `2026.${dummyMonth}.${dummyDay}`;
-    const rcptEnd = `2026.${dummyMonth}.${dummyEndDay}`;
-    const dday = calculateDday(`2026${dummyMonth}${dummyEndDay}`);
+    // 접수중, 접수예정, 마감 상태를 규칙적으로 배치
+    let itemStatus: '접수중' | '접수예정' | '마감';
+    let month: number;
+    let endDay: number;
+    let bgDay: number;
+
+    if (i % 3 === 0) {
+      itemStatus = '접수중';
+      month = 10;
+      bgDay = 5 + (i % 10);
+      endDay = 25 + (i % 5);
+    } else if (i % 3 === 1) {
+      itemStatus = '접수예정';
+      month = 11;
+      bgDay = 10 + (i % 10);
+      endDay = 28;
+    } else {
+      itemStatus = '마감';
+      month = 3 + (i % 5);
+      bgDay = 2;
+      endDay = 20;
+    }
+
+    const mStr = String(month).padStart(2, '0');
+    const bgStr = String(bgDay).padStart(2, '0');
+    const endStr = String(endDay).padStart(2, '0');
+    const rcptBg = `2026.${mStr}.${bgStr}`;
+    const rcptEnd = `2026.${mStr}.${endStr}`;
+    const dday = itemStatus === '마감' ? '마감' : calculateDday(`2026${mStr}${endStr}`);
 
     return {
       id: serialNumber,
-      status: dday === '마감' ? '마감' : (i % 3 === 0 ? '접수예정' : '접수중'),
-      title: `(공고-제2026-${serialNumber}호) ${actualDept} 2026년도 국가R&D 전략기술개발 및 실증과제 공고 (${itemIndex}번)`,
+      status: itemStatus,
+      title: `(공고-제2026-${serialNumber}호) ${actualDept} 2026년도 국가R&D 전략기술개발 및 실증과제 공고`,
       dept: actualDept,
       rcptBg,
       rcptEnd,
       dday,
       noticeType: i % 2 === 0 ? '통합공고' : '개별공고',
       agency: `${actualDept} 전문관리기관`,
-      irisUrl: 'https://www.iris.go.kr/contents/retrieveBsnsAncmList.do',
       noticeDate: rcptBg,
       rcptEndTime: '18:00',
       noticeCategory: i % 4 === 0 ? '수요조사' : '본공고',
-      budget: `${(itemIndex * 0.5 + 2).toFixed(1)} 억원`,
+      budget: `${(i * 0.4 + 2.5).toFixed(1)} 억원`,
       contact: '042-869-1114',
       projectName: `${actualDept} 미래핵심 연구개발사업`,
       files: [`1. 2026년도_${actualDept}_공고문_${serialNumber}.pdf`],
       content: '본 공고의 세부 신청자격, 지원내용 및 서식은 범부처통합연구지원시스템(IRIS) 사업공고를 참조하시기 바랍니다.'
     };
-  }).filter(Boolean);
+  });
+
+  // 상태 필터 적용
+  let filtered = allNotices;
+  if (status !== '전체') {
+    filtered = filtered.filter(item => item.status === status);
+  }
+
+  // 기간 필터 적용
+  if (time === '6m') {
+    filtered = filtered.filter(item => item.rcptBg >= '2026.03.01');
+  }
+
+  // 검색어 필터 적용
+  if (keyword.trim()) {
+    const q = keyword.toLowerCase();
+    filtered = filtered.filter(item => 
+      item.title.toLowerCase().includes(q) || 
+      item.dept.toLowerCase().includes(q) ||
+      item.agency.toLowerCase().includes(q)
+    );
+  }
+
+  // 페이징 계산
+  const totalCount = filtered.length;
+  const startIndex = (page - 1) * size;
+  const paginated = filtered.slice(startIndex, startIndex + size);
 
   return NextResponse.json({
     success: true,
-    items: dynamicItems,
-    totalCount: currentTotal
+    items: paginated,
+    totalCount: totalCount
   });
 }
