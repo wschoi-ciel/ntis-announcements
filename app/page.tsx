@@ -20,7 +20,7 @@ const ALL_DEPTS = [
 
 interface NoticeDetail {
   id: string | number;
-  status: string;
+  status: '접수중' | '접수예정' | '마감';
   title: string;
   dept: string;
   rcptBg: string;
@@ -36,6 +36,7 @@ interface NoticeDetail {
   projectName: string;
   files: string[];
   content: string;
+  ntisUrl: string;
   irisDirectUrl: string;
 }
 
@@ -59,7 +60,7 @@ export default function Home() {
   const [selectedNotice, setSelectedNotice] = useState<NoticeDetail | null>(null);
   const [checkedIds, setCheckedIds] = useState<(string | number)[]>([]);
 
-  // API 호출하여 필터링된 실제 공고만 로드
+  // NTIS 실제 OpenAPI 호출
   const fetchLiveAnnouncements = useCallback(async () => {
     setLoading(true);
     setApiMessage('');
@@ -78,8 +79,8 @@ export default function Home() {
       
       if (data.success) {
         setNotices(data.items || []);
-        // 필터에 따라 달라진 실제 건수를 그대로 반영
-        setTotalItems(data.totalCount ?? (data.items ? data.items.length : 0));
+        // 부처/필터별로 달라지는 실제 모수 반영
+        setTotalItems(data.totalCount || (data.items ? data.items.length : 0));
         if (data.message) setApiMessage(data.message);
       } else {
         setNotices([]);
@@ -100,7 +101,6 @@ export default function Home() {
     fetchLiveAnnouncements();
   }, [fetchLiveAnnouncements]);
 
-  // 필터 변경 시 1페이지부터 다시 조회
   const handleStatusChange = (st: string) => {
     setNoticeStatus(st);
     setCurrentPage(1);
@@ -180,7 +180,7 @@ export default function Home() {
 
   const handleExportCsv = () => {
     if (sortedList.length === 0) return;
-    const header = ['순번', '상태', '공고명', '소관부처', '전담기관', '접수시작일', '접수마감일', 'D-day', '지원규모'];
+    const header = ['과제고유번호', '상태', '과제명', '소관부처', '전문기관', '연구시작일', '연구종료일', 'D-day', '연구비'];
     const rows = sortedList.map((n) => [
       n.id,
       n.status,
@@ -197,7 +197,7 @@ export default function Home() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `실제_공고목록_${selectedDept}_${noticeStatus}_p${currentPage}.csv`);
+    link.setAttribute('download', `NTIS_실시간과제공고_${selectedDept}_${noticeStatus}_p${currentPage}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -205,7 +205,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-900 pb-28">
-      {/* 1. 상단 글로벌 헤더 */}
+      {/* 1. 상단 헤더 */}
       <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-sm">
         <div className="max-w-6xl mx-auto px-6 h-18 py-3.5 flex items-center justify-between">
           <div 
@@ -219,10 +219,10 @@ export default function Home() {
               <div className="flex items-center gap-2">
                 <span className="font-bold text-xl text-slate-900 tracking-tight">국가R&D 통합공고</span>
                 <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                  실시간 API
+                  NTIS 공식 OpenAPI
                 </span>
               </div>
-              <p className="text-xs text-slate-500 font-normal mt-0.5">정부 부처별 실시간 공고 모니터링 시스템</p>
+              <p className="text-xs text-slate-500 font-normal mt-0.5">정부 부처별 실시간 과제공고 모니터링 시스템</p>
             </div>
           </div>
 
@@ -269,15 +269,26 @@ export default function Home() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {/* 해당 공고와 100% 일치하는 IRIS 직통 링크 */}
+                  {/* 해당 실제 공고명으로 정확히 일치 검색되는 IRIS 직통 링크 */}
                   <a
                     href={selectedNotice.irisDirectUrl}
                     target="_blank"
                     rel="noreferrer noopener"
-                    className="px-5 py-2.5 rounded-full bg-[#0070d2] hover:bg-[#005bb5] text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer"
-                    title="해당 공고의 IRIS 공식 상세 화면으로 이동합니다"
+                    className="px-4 py-2.5 rounded-full bg-[#0070d2] hover:bg-[#005bb5] text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                    title="해당 과제명으로 IRIS 공고를 검색합니다"
                   >
-                    IRIS 바로가기 ▶
+                    IRIS 공고 검색 ▶
+                  </a>
+
+                  {/* 매뉴얼 공식 규격의 NTIS 과제 상세 페이지 링크 */}
+                  <a
+                    href={selectedNotice.ntisUrl}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="px-4 py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                    title="NTIS 공식 과제 상세정보를 조회합니다"
+                  >
+                    NTIS 과제 상세 ▶
                   </a>
 
                   <span className="text-sm font-bold text-rose-600 bg-rose-50 border border-rose-200 px-3.5 py-1.5 rounded-full whitespace-nowrap">
@@ -303,57 +314,52 @@ export default function Home() {
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-6 rounded-xl bg-slate-50 border border-slate-100 text-sm">
                 <div>
-                  <span className="text-xs font-bold text-slate-500 block mb-1">지원 규모</span>
+                  <span className="text-xs font-bold text-slate-500 block mb-1">연구비 규모</span>
                   <span className="font-bold text-base text-blue-600">{selectedNotice.budget}</span>
                 </div>
                 <div>
-                  <span className="text-xs font-bold text-slate-500 block mb-1">공고 기관</span>
+                  <span className="text-xs font-bold text-slate-500 block mb-1">과제관리 전문기관</span>
                   <span className="font-bold text-slate-800">{selectedNotice.agency}</span>
                 </div>
                 <div>
-                  <span className="text-xs font-bold text-slate-500 block mb-1">접수 기간</span>
+                  <span className="text-xs font-bold text-slate-500 block mb-1">연구 기간</span>
                   <span className="font-bold text-slate-800">{selectedNotice.rcptBg} ~ {selectedNotice.rcptEnd}</span>
                 </div>
                 <div>
-                  <span className="text-xs font-bold text-slate-500 block mb-1">접수 마감 시간</span>
-                  <span className="font-bold text-slate-800">{selectedNotice.rcptEndTime}</span>
+                  <span className="text-xs font-bold text-slate-500 block mb-1">과제 고유번호</span>
+                  <span className="font-bold text-slate-800">{selectedNotice.id}</span>
                 </div>
               </div>
 
               <div className="space-y-6 pt-2 border-t border-slate-100 text-sm">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-slate-800">
-                  <div><strong className="font-bold text-slate-900">사업명:</strong> {selectedNotice.projectName}</div>
-                  <div><strong className="font-bold text-slate-900">문의처:</strong> {selectedNotice.contact}</div>
+                  <div><strong className="font-bold text-slate-900">예산 사업명:</strong> {selectedNotice.projectName}</div>
+                  <div><strong className="font-bold text-slate-900">연구책임자:</strong> {selectedNotice.contact}</div>
                 </div>
 
                 <div>
                   <h4 className="font-bold text-slate-900 mb-3 flex items-center gap-1.5 text-base">
                     <Paperclip className="w-4 h-4 text-slate-500" />
-                    첨부파일 ({selectedNotice.files.length})
+                    첨부자료 및 링크
                   </h4>
                   <div className="grid grid-cols-1 gap-2.5">
-                    {selectedNotice.files.map((file, idx) => (
-                      <div 
-                        key={idx} 
-                        className="flex items-center justify-between p-4 rounded-xl bg-slate-50 hover:bg-white border border-slate-200 hover:border-blue-400 hover:shadow-sm transition cursor-pointer group"
-                      >
-                        <span className="text-sm font-bold text-slate-700 truncate pr-4 group-hover:text-blue-600">
-                          {file}
-                        </span>
-                        <Download className="w-4 h-4 text-slate-400 group-hover:text-blue-600 flex-shrink-0" />
-                      </div>
-                    ))}
+                    <a 
+                      href={selectedNotice.ntisUrl}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="flex items-center justify-between p-4 rounded-xl bg-slate-50 hover:bg-white border border-slate-200 hover:border-blue-400 hover:shadow-sm transition cursor-pointer group"
+                    >
+                      <span className="text-sm font-bold text-slate-700 truncate pr-4 group-hover:text-blue-600">
+                        NTIS 과제 상세원문 ({selectedNotice.id}) 바로가기
+                      </span>
+                      <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-blue-600 flex-shrink-0" />
+                    </a>
                   </div>
                 </div>
 
                 <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <h4 className="font-bold text-slate-900 text-base">공고 내용</h4>
-                    <span className="text-xs text-red-500 font-bold">
-                      ※ 자세한 내용은 <a href={selectedNotice.irisDirectUrl} target="_blank" rel="noreferrer noopener" className="underline text-blue-600 font-bold">공식 사업공고</a>에서 확인하시기 바랍니다.
-                    </span>
-                  </div>
-                  <div className="p-5 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-sm leading-relaxed min-h-[100px]">
+                  <h4 className="font-bold text-slate-900 mb-2 text-base">연구개발 내용 및 요약</h4>
+                  <div className="p-5 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-sm leading-relaxed min-h-[100px] whitespace-pre-wrap">
                     {selectedNotice.content}
                   </div>
                 </div>
@@ -364,14 +370,14 @@ export default function Home() {
           /* ===================== 메인 공고 목록 화면 ===================== */
           <div className="space-y-6">
             <div className="bg-white rounded-2xl border border-slate-200 p-7 shadow-sm space-y-6">
-              {/* 1. 검색 입력창 */}
+              {/* 1. 검색창 */}
               <form onSubmit={handleSearch} className="relative flex items-center">
                 <Search className="absolute left-4 w-5 h-5 text-slate-400" />
                 <input
                   type="text"
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="공고명, 부처명, 전문기관, 사업 키워드 검색"
+                  placeholder="과제명, 부처명, 전문기관, 키워드 검색"
                   className="w-full pl-12 pr-28 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-base text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition font-bold"
                 />
                 <button
@@ -382,7 +388,7 @@ export default function Home() {
                 </button>
               </form>
 
-              {/* 2. 상태 필터 & 기간 필터 */}
+              {/* 2. 상태 & 기간 필터 */}
               <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-100">
                 <div className="flex flex-wrap items-center gap-3">
                   <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl">
@@ -471,10 +477,10 @@ export default function Home() {
               </div>
             </div>
 
-            {/* 통계 및 정렬 바: 필터 조건에 따라 동적으로 변하는 실제 건수 표시 */}
+            {/* 통계 및 정렬 바: 부처 및 상태 선택 시 실제 건수가 동적으로 변경 */}
             <div className="flex flex-wrap items-center justify-between gap-3 px-2">
               <span className="text-sm font-bold text-slate-600">
-                조회된 실제 공고 <strong className="text-slate-900 text-base">{totalItems.toLocaleString()}</strong>건
+                조회된 실제 과제공고 <strong className="text-slate-900 text-base">{totalItems.toLocaleString()}</strong>건
                 {selectedDept !== '전체' && <span className="text-blue-600 ml-1">({selectedDept})</span>}
                 {noticeStatus !== '전체' && <span className="text-emerald-600 ml-1">[{noticeStatus}]</span>}
                 <span className="text-slate-400 font-normal ml-2">
@@ -533,12 +539,12 @@ export default function Home() {
                           className="w-4 h-4 rounded text-blue-600 cursor-pointer"
                         />
                       </th>
-                      <th className="py-4 px-3 w-20 text-center">순번</th>
+                      <th className="py-4 px-3 w-28 text-center">과제고유번호</th>
                       <th className="py-4 px-3 w-24 text-center">현황</th>
-                      <th className="py-4 px-6">공고명</th>
+                      <th className="py-4 px-6">과제명</th>
                       <th className="py-4 px-4 w-36 text-center">부처명</th>
-                      <th className="py-4 px-4 w-32 text-center">접수일</th>
-                      <th className="py-4 px-4 w-32 text-center text-blue-700">마감일 ⬇</th>
+                      <th className="py-4 px-4 w-32 text-center">연구시작일</th>
+                      <th className="py-4 px-4 w-32 text-center text-blue-700">종료일 ⬇</th>
                       <th className="py-4 px-4 w-36 text-center">D-day</th>
                     </tr>
                   </thead>
@@ -546,7 +552,7 @@ export default function Home() {
                     {loading ? (
                       <tr>
                         <td colSpan={8} className="py-24 text-center text-slate-400 font-bold text-base">
-                          실시간 공고 데이터를 불러오는 중입니다...
+                          NTIS 실시간 과제공고를 불러오는 중입니다...
                         </td>
                       </tr>
                     ) : sortedList.length === 0 ? (
@@ -554,7 +560,7 @@ export default function Home() {
                         <td colSpan={8} className="py-24 text-center text-slate-500 font-bold text-base">
                           <div className="flex flex-col items-center justify-center gap-2">
                             <AlertCircle className="w-8 h-8 text-slate-400" />
-                            <span>{apiMessage || '선택하신 조건에 해당하는 실제 공고가 없습니다.'}</span>
+                            <span>{apiMessage || '선택하신 조건에 해당하는 실제 과제가 없습니다.'}</span>
                           </div>
                         </td>
                       </tr>
@@ -577,7 +583,7 @@ export default function Home() {
                           </td>
 
                           <td 
-                            className="py-4 px-3 text-center text-slate-500 font-medium whitespace-nowrap"
+                            className="py-4 px-3 text-center text-slate-500 font-medium whitespace-nowrap text-xs"
                             onClick={() => setSelectedNotice(item)}
                           >
                             {item.id}
@@ -650,7 +656,7 @@ export default function Home() {
                 </table>
               </div>
 
-              {/* 페이지네이션 바 */}
+              {/* 페이지네이션 */}
               {totalPages > 1 && (
                 <div className="p-5 bg-white border-t border-slate-200 flex items-center justify-center gap-1.5 text-xs sm:text-sm select-none">
                   <button
