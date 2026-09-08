@@ -42,7 +42,7 @@ interface NoticeDetail {
 export default function Home() {
   const [noticeStatus, setNoticeStatus] = useState<string>('전체');
   const [selectedDept, setSelectedDept] = useState<string>('전체');
-  const [timeFilter, setTimeFilter] = useState<'all' | '6m'>('all'); // all: 2년치(2025~2026), 6m: 최근 6개월
+  const [timeFilter, setTimeFilter] = useState<'all' | '6m'>('all');
   const [keyword, setKeyword] = useState<string>('');
   const [searchInput, setSearchInput] = useState<string>('');
   const [showAllDepts, setShowAllDepts] = useState<boolean>(false);
@@ -59,7 +59,7 @@ export default function Home() {
   const [selectedNotice, setSelectedNotice] = useState<NoticeDetail | null>(null);
   const [checkedIds, setCheckedIds] = useState<(string | number)[]>([]);
 
-  // API를 통해서만 실제 공고를 로드 (하드코딩 없음)
+  // API 호출하여 필터링된 실제 공고만 로드
   const fetchLiveAnnouncements = useCallback(async () => {
     setLoading(true);
     setApiMessage('');
@@ -78,11 +78,13 @@ export default function Home() {
       
       if (data.success) {
         setNotices(data.items || []);
-        setTotalItems(data.totalCount || 0);
+        // 필터에 따라 달라진 실제 건수를 그대로 반영
+        setTotalItems(data.totalCount ?? (data.items ? data.items.length : 0));
         if (data.message) setApiMessage(data.message);
       } else {
         setNotices([]);
         setTotalItems(0);
+        if (data.message) setApiMessage(data.message);
       }
     } catch (e) {
       console.error('Fetch error:', e);
@@ -98,19 +100,17 @@ export default function Home() {
     fetchLiveAnnouncements();
   }, [fetchLiveAnnouncements]);
 
-  // 상태 필터 변경 시 1페이지부터 재호출
+  // 필터 변경 시 1페이지부터 다시 조회
   const handleStatusChange = (st: string) => {
     setNoticeStatus(st);
     setCurrentPage(1);
   };
 
-  // 기간 필터(2년치 / 최근 6개월) 변경 시 1페이지부터 재호출
   const handleTimeChange = (tf: 'all' | '6m') => {
     setTimeFilter(tf);
     setCurrentPage(1);
   };
 
-  // 부처 필터 변경 시 1페이지부터 재호출
   const handleDeptSelect = (dept: string) => {
     setSelectedDept(dept);
     setSelectedNotice(null);
@@ -219,7 +219,7 @@ export default function Home() {
               <div className="flex items-center gap-2">
                 <span className="font-bold text-xl text-slate-900 tracking-tight">국가R&D 통합공고</span>
                 <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                  OpenAPI 실시간
+                  실시간 API
                 </span>
               </div>
               <p className="text-xs text-slate-500 font-normal mt-0.5">정부 부처별 실시간 공고 모니터링 시스템</p>
@@ -269,12 +269,13 @@ export default function Home() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                  {/* 해당 공고와 100% 일치하는 IRIS 직통 링크 */}
                   <a
                     href={selectedNotice.irisDirectUrl}
                     target="_blank"
                     rel="noreferrer noopener"
-                    className="px-5 py-2.5 rounded-full bg-[#0070d2] hover:bg-[#005bb5] text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition"
-                    title="해당 공고의 실제 상세 페이지로 이동합니다"
+                    className="px-5 py-2.5 rounded-full bg-[#0070d2] hover:bg-[#005bb5] text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                    title="해당 공고의 IRIS 공식 상세 화면으로 이동합니다"
                   >
                     IRIS 바로가기 ▶
                   </a>
@@ -381,7 +382,7 @@ export default function Home() {
                 </button>
               </form>
 
-              {/* 2. 상태 필터 & 기간 필터 (최대 2년치 2025~2026 / 최근 6개월) */}
+              {/* 2. 상태 필터 & 기간 필터 */}
               <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-100">
                 <div className="flex flex-wrap items-center gap-3">
                   <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl">
@@ -470,7 +471,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* 통계 및 정렬 바 */}
+            {/* 통계 및 정렬 바: 필터 조건에 따라 동적으로 변하는 실제 건수 표시 */}
             <div className="flex flex-wrap items-center justify-between gap-3 px-2">
               <span className="text-sm font-bold text-slate-600">
                 조회된 실제 공고 <strong className="text-slate-900 text-base">{totalItems.toLocaleString()}</strong>건
@@ -553,7 +554,7 @@ export default function Home() {
                         <td colSpan={8} className="py-24 text-center text-slate-500 font-bold text-base">
                           <div className="flex flex-col items-center justify-center gap-2">
                             <AlertCircle className="w-8 h-8 text-slate-400" />
-                            <span>{apiMessage || '조회된 실제 공고 내역이 없습니다.'}</span>
+                            <span>{apiMessage || '선택하신 조건에 해당하는 실제 공고가 없습니다.'}</span>
                           </div>
                         </td>
                       </tr>
