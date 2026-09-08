@@ -1,14 +1,11 @@
-// app/layout.tsx
 import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "±¹°¡R&D ÅëÇÕ°ø°í ½Ã½ºÅÛ",
-  description: "NTIS Á¤ºÎ ºÎÃ³º° »ç¾÷°ø°í ½Ç½Ã°£ ¸ğ´ÏÅÍ¸µ",
+  title: "êµ­ê°€R&D í†µí•©ê³µê³  ì‹œìŠ¤í…œ",
+  description: "NTIS ì •ë¶€ ë¶€ì²˜ë³„ ì‚¬ì—…ê³µê³  ì‹¤ì‹œê°„ ëª¨ë‹ˆí„°ë§",
   icons: {
     icon: "/icon.svg",
-    shortcut: "/icon.svg",
-    apple: "/icon.svg",
   },
 };
 
