@@ -31,7 +31,7 @@ function getXmlTag(xml, tag) {
   return match[1].replace(/<[^>]*>/g, '').trim();
 }
 
-async function fetchBatch(startPos, count) {
+async function fetchBatch(keyword, startPos, count) {
   const url = new URL(TARGET_URL);
   url.searchParams.set('apprvKey', API_KEY);
   url.searchParams.set('collection', 'project');
@@ -42,9 +42,10 @@ async function fetchBatch(startPos, count) {
   url.searchParams.set('sortby', 'DATE/DESC');
   url.searchParams.set('cmbnApiYn', 'Y');
   url.searchParams.set('searchField', 'BI');
-  url.searchParams.set('query', '*');
-  url.searchParams.set('SRWR', '*');
-  url.searchParams.set('addQuery', 'PY=2025/MORE');
+  
+  // 유효한 실무 검색어 지정 (와일드카드 대신 실제 연구 키워드)
+  url.searchParams.set('query', keyword);
+  url.searchParams.set('SRWR', keyword);
 
   const res = await fetch(url.toString(), {
     headers: {
@@ -54,13 +55,14 @@ async function fetchBatch(startPos, count) {
   });
 
   const xml = await res.text();
+  
   if (xml.includes('접근 허용 IP가 아닙니다')) {
-    throw new Error('IP 차단: 현재 PC의 외부 공인 IP가 1.217.108.124가 아닙니다.');
+    throw new Error('IP 차단: 등록된 IP(1.217.108.124)가 아닙니다.');
   }
 
-  const hitMatches = xml.match(/<HIT[\s\S]*?<\/HIT>/gi) || [];
-  const totalMatch = xml.match(/<TOTALHITS>(\d+)<\/TOTALHITS>/i);
+  const totalMatch = xml.match(/<TOTALHITS>(\d+)<\/TOTALHITS>/i) || xml.match(/<COLCOUNT[^>]*>(\d+)<\/COLCOUNT>/i);
   const totalHits = totalMatch ? parseInt(totalMatch[1], 10) : 0;
+  const hitMatches = xml.match(/<HIT[\s\S]*?<\/HIT>/gi) || [];
 
   const items = hitMatches.map((hitBlock, idx) => {
     const pjtId = getXmlTag(hitBlock, 'Project Number') || getXmlTag(hitBlock, 'ProjectNumber') || `${startPos + idx}`;
@@ -114,38 +116,40 @@ async function fetchBatch(startPos, count) {
 }
 
 async function run() {
-  console.log('🚀 NTIS 전 부처 실제 공고 수집 시작...');
-  const allItems = [];
-  const BATCH_SIZE = 100;
-  const MAX_RECORDS = 500;
-
-  let startPosition = 1;
-  let totalCount = 0;
+  console.log('🚀 NTIS 전 부처 실제 공고 일괄 수집 시작...');
+  // 전 부처 공고를 골고루 대량 수집할 수 있는 대표 키워드 풀
+  const targetKeywords = ['기술', '연구', '개발', '지원', '혁신', '플랫폼', '실증'];
+  const allItemsMap = new Map();
+  let grandTotal = 0;
 
   try {
-    while (startPosition <= MAX_RECORDS) {
-      process.stdout.write(`📥 수집 중: ${startPosition}번부터... `);
-      const { items, totalHits } = await fetchBatch(startPosition, BATCH_SIZE);
-      totalCount = totalHits;
+    for (const kw of targetKeywords) {
+      process.stdout.write(`📥 키워드 [${kw}] 과제 수집 중... `);
+      const { items, totalHits } = await fetchBatch(kw, 1, 100);
+      grandTotal += totalHits;
       
-      if (!items || items.length === 0) break;
-      allItems.push(...items);
-      console.log(`성공 (${allItems.length}건 수집 완료)`);
-
-      if (allItems.length >= totalHits || items.length < BATCH_SIZE) break;
-      startPosition += BATCH_SIZE;
+      items.forEach(item => {
+        if (!allItemsMap.has(item.id)) {
+          allItemsMap.set(item.id, item);
+        }
+      });
+      console.log(`성공 (${items.length}건 획득, 현재 고유 과제 누적: ${allItemsMap.size}건)`);
     }
 
-    const outputPath = path.join(process.cwd(), 'public', 'data', 'notices.json');
+    const finalItems = Array.from(allItemsMap.values());
+    const outputDir = path.join(process.cwd(), 'public', 'data');
+    if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+
+    const outputPath = path.join(outputDir, 'notices.json');
     fs.writeFileSync(outputPath, JSON.stringify({
       updatedAt: new Date().toISOString(),
-      totalCount: totalCount || allItems.length,
-      items: allItems
+      totalCount: grandTotal || finalItems.length,
+      items: finalItems
     }, null, 2), 'utf-8');
 
-    console.log(`✅ 수집 성공! 총 ${allItems.length}건의 실제 공고가 저장되었습니다.`);
+    console.log(`\n🎉 수집 대성공! 중복 제거된 총 ${finalItems.length}건의 실제 과제가 ${outputPath}에 저장되었습니다.`);
   } catch (err) {
-    console.error(`❌ 수집 실패:`, err.message);
+    console.error(`\n❌ 수집 실패:`, err.message);
     process.exit(1);
   }
 }
