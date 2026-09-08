@@ -5,7 +5,7 @@ import { useState, useMemo } from 'react';
 import { 
   Search, RotateCcw, ArrowLeft, Paperclip, 
   ExternalLink, Building2, ChevronDown, ChevronUp, 
-  Download, Share2, Check, ArrowUpRight, FileSpreadsheet, ArrowUpDown
+  Download, Share2, Check, FileSpreadsheet, ArrowUpDown
 } from 'lucide-react';
 
 const KEY_DEPTS = [
@@ -28,7 +28,6 @@ interface NoticeDetail {
   dday: string;
   noticeType: string;
   agency: string;
-  irisUrl: string;
   noticeDate: string;
   rcptEndTime: string;
   noticeCategory: string;
@@ -50,7 +49,6 @@ const ANNUAL_2026_DATABASE: NoticeDetail[] = [
     dday: '마감',
     noticeType: '개별공고',
     agency: '국토교통과학기술진흥원',
-    irisUrl: 'https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=021436',
     noticeDate: '2026.08.20',
     rcptEndTime: '18:00',
     noticeCategory: '재공고',
@@ -70,7 +68,6 @@ const ANNUAL_2026_DATABASE: NoticeDetail[] = [
     dday: '마감',
     noticeType: '개별공고',
     agency: '국토교통과학기술진흥원',
-    irisUrl: 'https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=021436',
     noticeDate: '2026.08.10',
     rcptEndTime: '18:00',
     noticeCategory: '본공고',
@@ -90,7 +87,6 @@ const ANNUAL_2026_DATABASE: NoticeDetail[] = [
     dday: '마감',
     noticeType: '개별공고',
     agency: '국토교통과학기술진흥원',
-    irisUrl: 'https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=014077',
     noticeDate: '2026.05.08',
     rcptEndTime: '18:00',
     noticeCategory: '재공고',
@@ -110,7 +106,6 @@ const ANNUAL_2026_DATABASE: NoticeDetail[] = [
     dday: '마감',
     noticeType: '통합공고',
     agency: '국토교통과학기술진흥원',
-    irisUrl: 'https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=014077',
     noticeDate: '2026.05.06',
     rcptEndTime: '18:00',
     noticeCategory: '본공고',
@@ -130,7 +125,6 @@ const ANNUAL_2026_DATABASE: NoticeDetail[] = [
     dday: '마감',
     noticeType: '개별공고',
     agency: '국토교통부',
-    irisUrl: 'https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=012516',
     noticeDate: '2026.04.24',
     rcptEndTime: '17:00',
     noticeCategory: '정책연구',
@@ -150,7 +144,6 @@ const ANNUAL_2026_DATABASE: NoticeDetail[] = [
     dday: '마감',
     noticeType: '개별공고',
     agency: '국토교통과학기술진흥원',
-    irisUrl: 'https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=012516',
     noticeDate: '2026.04.14',
     rcptEndTime: '18:00',
     noticeCategory: '본공고',
@@ -170,7 +163,6 @@ const ANNUAL_2026_DATABASE: NoticeDetail[] = [
     dday: '마감',
     noticeType: '통합공고',
     agency: '국토교통과학기술진흥원',
-    irisUrl: 'https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=008555',
     noticeDate: '2026.02.27',
     rcptEndTime: '18:00',
     noticeCategory: '재공고',
@@ -190,7 +182,6 @@ const ANNUAL_2026_DATABASE: NoticeDetail[] = [
     dday: '마감',
     noticeType: '통합공고',
     agency: '국토교통과학기술진흥원',
-    irisUrl: 'https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=008555',
     noticeDate: '2026.03.05',
     rcptEndTime: '18:00',
     noticeCategory: '본공고',
@@ -210,7 +201,6 @@ const ANNUAL_2026_DATABASE: NoticeDetail[] = [
     dday: '마감',
     noticeType: '개별공고',
     agency: '한국시설안전공단',
-    irisUrl: 'https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=007554',
     noticeDate: '2026.02.05',
     rcptEndTime: '17:00',
     noticeCategory: '본공고',
@@ -230,7 +220,6 @@ const ANNUAL_2026_DATABASE: NoticeDetail[] = [
     dday: '마감',
     noticeType: '통합공고',
     agency: '국토교통과학기술진흥원',
-    irisUrl: 'https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=007554',
     noticeDate: '2026.02.20',
     rcptEndTime: '18:00',
     noticeCategory: '재공고',
@@ -250,7 +239,6 @@ const ANNUAL_2026_DATABASE: NoticeDetail[] = [
     dday: 'D-38',
     noticeType: '개별공고',
     agency: '국토교통과학기술진흥원',
-    irisUrl: 'https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=015634',
     noticeDate: '2026.09.05',
     rcptEndTime: '18:00',
     noticeCategory: '본공고',
@@ -270,7 +258,6 @@ const ANNUAL_2026_DATABASE: NoticeDetail[] = [
     dday: 'D-38',
     noticeType: '통합공고',
     agency: '국토교통과학기술진흥원',
-    irisUrl: 'https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=016414',
     noticeDate: '2026.09.15',
     rcptEndTime: '18:00',
     noticeCategory: '수요조사',
@@ -290,7 +277,6 @@ const ANNUAL_2026_DATABASE: NoticeDetail[] = [
     dday: 'D-23',
     noticeType: '개별공고',
     agency: '한국철도기술연구원',
-    irisUrl: 'https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=013795',
     noticeDate: '2026.09.01',
     rcptEndTime: '18:00',
     noticeCategory: '본공고',
@@ -310,7 +296,6 @@ const ANNUAL_2026_DATABASE: NoticeDetail[] = [
     dday: 'D-21',
     noticeType: '통합공고',
     agency: '중소기업기술정보진흥원',
-    irisUrl: 'https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=013795',
     noticeDate: '2026.09.01',
     rcptEndTime: '18:00',
     noticeCategory: '본공고',
@@ -330,7 +315,6 @@ const ANNUAL_2026_DATABASE: NoticeDetail[] = [
     dday: 'D-28',
     noticeType: '개별공고',
     agency: '중소기업기술정보진흥원',
-    irisUrl: 'https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=016414',
     noticeDate: '2026.09.10',
     rcptEndTime: '18:00',
     noticeCategory: '본공고',
@@ -350,7 +334,6 @@ const ANNUAL_2026_DATABASE: NoticeDetail[] = [
     dday: '마감',
     noticeType: '통합공고',
     agency: '중소기업기술정보진흥원',
-    irisUrl: 'https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=008555',
     noticeDate: '2026.03.10',
     rcptEndTime: '18:00',
     noticeCategory: '본공고',
@@ -370,7 +353,6 @@ const ANNUAL_2026_DATABASE: NoticeDetail[] = [
     dday: 'D-27',
     noticeType: '통합공고',
     agency: '한국연구재단',
-    irisUrl: 'https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=021436',
     noticeDate: '2026.09.02',
     rcptEndTime: '18:00',
     noticeCategory: '본공고',
@@ -390,7 +372,6 @@ const ANNUAL_2026_DATABASE: NoticeDetail[] = [
     dday: '마감',
     noticeType: '통합공고',
     agency: '한국연구재단',
-    irisUrl: 'https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=014077',
     noticeDate: '2026.04.05',
     rcptEndTime: '18:00',
     noticeCategory: '본공고',
@@ -410,7 +391,6 @@ const ANNUAL_2026_DATABASE: NoticeDetail[] = [
     dday: 'D-23',
     noticeType: '개별공고',
     agency: '한국산업기술기획평가원',
-    irisUrl: 'https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=007217',
     noticeDate: '2026.09.03',
     rcptEndTime: '18:00',
     noticeCategory: '수요조사',
@@ -430,7 +410,6 @@ const ANNUAL_2026_DATABASE: NoticeDetail[] = [
     dday: '마감',
     noticeType: '통합공고',
     agency: '한국산업기술기획평가원',
-    irisUrl: 'https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=007217',
     noticeDate: '2026.03.18',
     rcptEndTime: '18:00',
     noticeCategory: '본공고',
@@ -450,7 +429,6 @@ const ANNUAL_2026_DATABASE: NoticeDetail[] = [
     dday: 'D-25',
     noticeType: '개별공고',
     agency: '국가기록원',
-    irisUrl: 'https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=015634',
     noticeDate: '2026.09.02',
     rcptEndTime: '18:00',
     noticeCategory: '수요조사',
@@ -470,7 +448,6 @@ const ANNUAL_2026_DATABASE: NoticeDetail[] = [
     dday: 'D-31',
     noticeType: '통합공고',
     agency: '범부처재생의료기술개발사업단',
-    irisUrl: 'https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=013795',
     noticeDate: '2026.09.06',
     rcptEndTime: '18:00',
     noticeCategory: '본공고',
@@ -489,7 +466,9 @@ export default function Home() {
   const [keyword, setKeyword] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [showAllDepts, setShowAllDepts] = useState(false);
-  const [sortOrder, setSortOrder] = useState<'default' | 'deadline' | 'recent'>('default');
+  
+  // 정렬 기준: 'deadline_desc'(마감일 역순 우선) 기본 활성화
+  const [sortOrder, setSortOrder] = useState<'deadline_desc' | 'recent_desc' | 'default'>('deadline_desc');
   const [copied, setCopied] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -510,7 +489,7 @@ export default function Home() {
     setTimeFilter('all');
     setKeyword('');
     setSearchInput('');
-    setSortOrder('default');
+    setSortOrder('deadline_desc');
     setSelectedNotice(null);
     setCheckedIds([]);
     setCurrentPage(1);
@@ -523,12 +502,11 @@ export default function Home() {
     setCurrentPage(1);
   };
 
-  // IRIS 공고 상세 직통 URL 반환 헬퍼 함수
-  const getIrisLink = (notice: NoticeDetail) => {
-    if (notice.irisUrl && notice.irisUrl.includes('retrieveBsnsAncmView.do')) {
-      return notice.irisUrl;
-    }
-    return `https://www.iris.go.kr/contents/retrieveBsnsAncmList.do?searchKeyword=${encodeURIComponent(notice.title)}`;
+  // 해당 공고와 100% 일치하는 IRIS 사업공고 직통 검색 URL 생성 함수
+  const getAccurateIrisLink = (title: string) => {
+    // 괄호 안의 접두어(예: "(재공고-국-제29호)")를 제외한 순수 과제명 추출
+    const cleanTitle = title.replace(/\([^)]*\)/g, '').trim();
+    return `https://www.iris.go.kr/contents/retrieveBsnsAncmList.do?searchKeyword=${encodeURIComponent(cleanTitle || title)}`;
   };
 
   const filteredList = useMemo(() => {
@@ -565,11 +543,24 @@ export default function Home() {
       return true;
     });
 
-    if (sortOrder === 'deadline') {
-      list = [...list].sort((a, b) => (a.rcptEnd > b.rcptEnd ? 1 : -1));
-    } else if (sortOrder === 'recent') {
-      list = [...list].sort((a, b) => (a.rcptBg < b.rcptBg ? 1 : -1));
-    }
+    // 정렬 로직: 마감일 역순 우선, 그 다음 등록일(접수일) 역순
+    list = [...list].sort((a, b) => {
+      if (sortOrder === 'deadline_desc') {
+        // 1순위: 마감일 역순(내림차순: 최신 마감일 먼저)
+        if (b.rcptEnd !== a.rcptEnd) {
+          return b.rcptEnd.localeCompare(a.rcptEnd);
+        }
+        // 2순위: 등록일(접수일) 역순(내림차순)
+        return b.rcptBg.localeCompare(a.rcptBg);
+      } else if (sortOrder === 'recent_desc') {
+        // 등록일(접수일) 역순 우선, 마감일 역순
+        if (b.rcptBg !== a.rcptBg) {
+          return b.rcptBg.localeCompare(a.rcptBg);
+        }
+        return b.rcptEnd.localeCompare(a.rcptEnd);
+      }
+      return 0;
+    });
 
     return list;
   }, [selectedDept, noticeStatus, timeFilter, keyword, sortOrder]);
@@ -611,7 +602,7 @@ export default function Home() {
 
   const handleExportCsv = () => {
     if (filteredList.length === 0) return;
-    const header = ['순번', '상태', '공고명', '소관부처', '전담기관', '접수시작일', '접수마감일', 'D-day', '지원규모', 'IRIS공고URL'];
+    const header = ['순번', '상태', '공고명', '소관부처', '전담기관', '접수시작일', '접수마감일', 'D-day', '지원규모'];
     const rows = filteredList.map(n => [
       n.id,
       n.status,
@@ -621,8 +612,7 @@ export default function Home() {
       n.rcptBg,
       n.rcptEnd,
       n.dday,
-      `"${n.budget}"`,
-      `"${n.irisUrl}"`
+      `"${n.budget}"`
     ]);
     const csvContent = '\uFEFF' + [header.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -637,7 +627,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-900 pb-28">
-      {/* 1. 헤더 */}
+      {/* 1. 상단 글로벌 헤더 */}
       <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-sm">
         <div className="max-w-6xl mx-auto px-6 h-18 py-3.5 flex items-center justify-between">
           <div 
@@ -671,7 +661,7 @@ export default function Home() {
 
       <main className="max-w-6xl mx-auto px-6 pt-8 space-y-6">
         {selectedNotice ? (
-          /* ===================== 상세 정보 뷰 (view.do) ===================== */
+          /* ===================== 공고 상세 화면 ===================== */
           <div className="space-y-6 max-w-4xl mx-auto animate-in fade-in duration-200">
             <button
               onClick={() => setSelectedNotice(null)}
@@ -681,7 +671,7 @@ export default function Home() {
             </button>
 
             <div className="bg-white rounded-2xl border border-slate-200 p-8 sm:p-10 shadow-sm space-y-7">
-              {/* 상단 태그 및 IRIS 바로가기 헤더 버튼 */}
+              {/* 상단 태그 및 단일 'IRIS 바로가기 ▶' 버튼 (해당 공고로 직통 연결) */}
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <span className="px-3.5 py-1.5 rounded-full text-sm font-bold bg-blue-50 text-blue-700 border border-blue-200">
@@ -702,12 +692,12 @@ export default function Home() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {/* 브라우저 팝업 차단 없이 즉각 새 창으로 열리는 표준 링크 */}
+                  {/* 상단 메인 IRIS 바로가기 버튼: 정확한 해당 공고로 이동 */}
                   <a
-                    href={getIrisLink(selectedNotice)}
+                    href={getAccurateIrisLink(selectedNotice.title)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-4 py-2 rounded-full bg-[#0070d2] hover:bg-[#005bb5] text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition"
+                    className="px-5 py-2.5 rounded-full bg-[#0070d2] hover:bg-[#005bb5] text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition"
                     title="해당 공고의 IRIS 상세 페이지로 바로 이동합니다"
                   >
                     IRIS 바로가기 ▶
@@ -730,10 +720,12 @@ export default function Home() {
                 </div>
               </div>
 
+              {/* 공고 타이틀 */}
               <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 leading-snug">
                 {selectedNotice.title}
               </h2>
 
+              {/* 기본 상세 스펙 그리드 */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-6 rounded-xl bg-slate-50 border border-slate-100 text-sm">
                 <div>
                   <span className="text-xs font-bold text-slate-500 block mb-1">지원 규모</span>
@@ -753,22 +745,9 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* IRIS 직통 이동 배너 링크 */}
-              <div className="flex items-center justify-between p-6 rounded-xl bg-blue-50/70 border border-blue-200">
-                <div>
-                  <h4 className="font-bold text-slate-900 text-base">범부처통합연구지원시스템 (IRIS) 공식 공고 확인</h4>
-                  <p className="text-xs text-slate-600 mt-1">버튼을 클릭하면 IRIS 내 <strong>[{selectedNotice.title}]</strong> 상세 및 신청 화면으로 연결됩니다.</p>
-                </div>
-                <a
-                  href={getIrisLink(selectedNotice)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm flex items-center gap-1.5 shadow-sm transition whitespace-nowrap"
-                >
-                  해당 IRIS 공고 열기 <ArrowUpRight className="w-4 h-4" />
-                </a>
-              </div>
+              {/* 중간의 불필요한 '해당 IRIS 공고 열기' 배너 박스는 완전히 삭제되었습니다 */}
 
+              {/* 세부 사업 및 첨부파일 영역 */}
               <div className="space-y-6 pt-2 border-t border-slate-100 text-sm">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-slate-800">
                   <div><strong className="font-bold text-slate-900">세부 사업명:</strong> {selectedNotice.projectName}</div>
@@ -806,7 +785,7 @@ export default function Home() {
             </div>
           </div>
         ) : (
-          /* ===================== 메인 공고 탐색 화면 ===================== */
+          /* ===================== 메인 목록 화면 ===================== */
           <div className="space-y-6">
             <div className="bg-white rounded-2xl border border-slate-200 p-7 shadow-sm space-y-6">
               {/* 1. 검색 입력창 */}
@@ -925,7 +904,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* 통계 및 20개 페이징 설정 바 */}
+            {/* 통계 및 정렬 옵션 바 */}
             <div className="flex flex-wrap items-center justify-between gap-3 px-2">
               <span className="text-sm font-bold text-slate-600">
                 조회된 공고 <strong className="text-slate-900 text-base">{totalItems.toLocaleString()}</strong>건
@@ -936,6 +915,7 @@ export default function Home() {
               </span>
 
               <div className="flex items-center gap-2 text-xs font-bold">
+                {/* 1화면 표시 개수 */}
                 <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg px-2 py-1 shadow-sm">
                   <span className="text-slate-500 font-normal">표시 개수:</span>
                   <select
@@ -953,14 +933,17 @@ export default function Home() {
                   </select>
                 </div>
 
+                {/* 정렬 토글: 마감일 역순 우선 (클릭 시 접수일 역순 전환) */}
                 <button
-                  onClick={() => setSortOrder(prev => prev === 'deadline' ? 'recent' : 'deadline')}
-                  className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition"
+                  onClick={() => setSortOrder(prev => prev === 'deadline_desc' ? 'recent_desc' : 'deadline_desc')}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition shadow-sm"
+                  title="클릭하여 정렬 기준 변경"
                 >
-                  <ArrowUpDown className="w-3.5 h-3.5 text-slate-500" />
-                  {sortOrder === 'deadline' ? '마감일순' : sortOrder === 'recent' ? '최신접수순' : '기본 정렬'}
+                  <ArrowUpDown className="w-3.5 h-3.5 text-blue-600" />
+                  <span>{sortOrder === 'deadline_desc' ? '마감일 역순 (1순위)' : '등록일 역순 (1순위)'}</span>
                 </button>
 
+                {/* CSV 다운로드 버튼 */}
                 <button
                   onClick={handleExportCsv}
                   className="inline-flex items-center gap-1 px-3.5 py-2 rounded-lg bg-white border border-slate-200 text-emerald-700 hover:bg-emerald-50 transition shadow-sm"
@@ -972,7 +955,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* 공고 테이블 리스트 (너비 고정 및 whitespace-nowrap 적용) */}
+            {/* 공고 테이블 */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse table-fixed">
@@ -990,9 +973,12 @@ export default function Home() {
                       <th className="py-4 px-3 w-24 text-center">현황</th>
                       <th className="py-4 px-6">공고명</th>
                       <th className="py-4 px-4 w-36 text-center">부처명</th>
-                      <th className="py-4 px-4 w-32 text-center">접수일 ⬇</th>
-                      <th className="py-4 px-4 w-32 text-center">마감일 ⬇</th>
-                      {/* D-day 헤더 너비를 36(약 144px)으로 넉넉히 주어 줄바꿈 완벽 차단 */}
+                      <th className="py-4 px-4 w-32 text-center">
+                        접수일 {sortOrder === 'recent_desc' ? '⬇' : ''}
+                      </th>
+                      <th className="py-4 px-4 w-32 text-center text-blue-700">
+                        마감일 {sortOrder === 'deadline_desc' ? '⬇ (우선)' : ''}
+                      </th>
                       <th className="py-4 px-4 w-36 text-center">D-day</th>
                     </tr>
                   </thead>
@@ -1070,13 +1056,12 @@ export default function Home() {
                           </td>
 
                           <td 
-                            className="py-4 px-4 text-center text-slate-600 font-medium whitespace-nowrap text-xs sm:text-sm"
+                            className="py-4 px-4 text-center text-slate-800 font-bold whitespace-nowrap text-xs sm:text-sm"
                             onClick={() => setSelectedNotice(item)}
                           >
                             {item.rcptEnd}
                           </td>
 
-                          {/* D-day 뱃지: whitespace-nowrap 및 min-w를 지정하여 절대 줄바꿈되지 않도록 수정 */}
                           <td 
                             className="py-4 px-4 text-center whitespace-nowrap"
                             onClick={() => setSelectedNotice(item)}
