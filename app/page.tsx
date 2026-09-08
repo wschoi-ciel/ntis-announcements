@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   Search, RotateCcw, ArrowLeft, Paperclip, 
   ExternalLink, Building2, ChevronDown, ChevronUp, 
-  Download, Share2, Check, FileSpreadsheet, ArrowUpDown, AlertCircle
+  Download, Share2, Check, FileSpreadsheet, ArrowUpDown, AlertCircle, ShieldAlert
 } from 'lucide-react';
 
 const KEY_DEPTS = [
@@ -56,14 +56,75 @@ export default function Home() {
   const [notices, setNotices] = useState<NoticeDetail[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [apiMessage, setApiMessage] = useState<string>('');
+  const [isIpRestricted, setIsIpRestricted] = useState<boolean>(false);
 
   const [selectedNotice, setSelectedNotice] = useState<NoticeDetail | null>(null);
   const [checkedIds, setCheckedIds] = useState<(string | number)[]>([]);
 
-  // 실제 OpenAPI 호출
+  // XML 파싱 헬퍼 함수
+  const parseXmlResponse = (xmlText: string, page: number, size: number) => {
+    const getXmlTag = (xml: string, tag: string): string => {
+      const tagPattern = tag.replace(/\s+/g, '\\s+');
+      const reg = new RegExp(`<${tagPattern}[^>]*>([\\s\\S]*?)<\\/${tagPattern}>`, 'i');
+      const match = xml.match(reg);
+      if (!match) return '';
+      return match[1].replace(/<[^>]*>/g, '').trim();
+    };
+
+    const totalMatch = xmlText.match(/<TOTALHITS>(\d+)<\/TOTALHITS>/i) || 
+                       xmlText.match(/<COLCOUNT[^>]*>(\d+)<\/COLCOUNT>/i);
+    const apiTotalHits = totalMatch ? parseInt(totalMatch[1], 10) : 0;
+    const hitMatches = xmlText.match(/<HIT[\s\S]*?<\/HIT>/gi) || [];
+
+    const items: NoticeDetail[] = hitMatches.map((hitBlock, idx) => {
+      const pjtId = getXmlTag(hitBlock, 'Project Number') || getXmlTag(hitBlock, 'ProjectNumber') || `${page}-${idx + 1}`;
+      const titleRaw = getXmlTag(hitBlock, 'Korean') || getXmlTag(hitBlock, 'ProjectTitle') || '과제명 정보 없음';
+      const cleanTitle = titleRaw.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
+      const ministry = getXmlTag(hitBlock, 'Ministry') || getXmlTag(hitBlock, 'Name') || '과학기술정보통신부';
+      const agency = getXmlTag(hitBlock, 'OrderAgency') || getXmlTag(hitBlock, 'ManageAgency') || '전문기관';
+      const budgetProject = getXmlTag(hitBlock, 'BudgetProject') || getXmlTag(hitBlock, 'BusinessName') || cleanTitle;
+      const manager = getXmlTag(hitBlock, 'Manager') || '연구책임자';
+      const rawStart = getXmlTag(hitBlock, 'Start');
+      const rawEnd = getXmlTag(hitBlock, 'End');
+      const totalFundsRaw = getXmlTag(hitBlock, 'TotalFunds') || getXmlTag(hitBlock, 'GovernmentFunds');
+
+      const bg = rawStart && rawStart.length >= 8 
+        ? `${rawStart.substring(0, 4)}.${rawStart.substring(4, 6)}.${rawStart.substring(6, 8)}` : '2026.01.01';
+      const end = rawEnd && rawEnd.length >= 8 
+        ? `${rawEnd.substring(0, 4)}.${rawEnd.substring(4, 6)}.${rawEnd.substring(6, 8)}` : '2026.12.31';
+
+      return {
+        id: pjtId,
+        status: '접수중',
+        title: cleanTitle,
+        dept: ministry,
+        rcptBg: bg,
+        rcptEnd: end,
+        dday: '접수중',
+        noticeType: '국가R&D과제',
+        agency,
+        noticeDate: bg,
+        rcptEndTime: '18:00',
+        noticeCategory: '본공고',
+        budget: totalFundsRaw ? `${(Number(totalFundsRaw) / 100000000).toFixed(1)} 억원` : '공고문 참조',
+        contact: manager,
+        projectName: budgetProject,
+        files: [`1. 과제요약서_${pjtId}.pdf`],
+        content: getXmlTag(hitBlock, 'Abstract') || '세부 연구목표는 상세페이지를 참조하시기 바랍니다.',
+        ntisUrl: `https://www.ntis.go.kr/project/pjtInfo.do?pjtId=${pjtId}`,
+        irisDirectUrl: `https://www.iris.go.kr/contents/retrieveBsnsAncmList.do?searchKeyword=${encodeURIComponent(cleanTitle)}`
+      };
+    });
+
+    return { items, totalCount: apiTotalHits || items.length };
+  };
+
+  // 1. 서버 API 호출 $\rightarrow$ 2. IP 차단 시 클라이언트 직접 호출 모드 연계
   const fetchLiveAnnouncements = useCallback(async () => {
     setLoading(true);
     setApiMessage('');
+    setIsIpRestricted(false);
+
     try {
       const params = new URLSearchParams({
         page: String(currentPage),
@@ -77,20 +138,40 @@ export default function Home() {
       const res = await fetch(`/api/announcements?${params.toString()}`);
       const data = await res.json();
       
-      if (data.success) {
-        setNotices(data.items || []);
-        setTotalItems(data.totalCount || (data.items ? data.items.length : 0));
-        if (data.message) setApiMessage(data.message);
-      } else {
-        setNotices([]);
-        setTotalItems(0);
-        if (data.message) setApiMessage(data.message);
+      if (data.success && data.items && data.items.length > 0) {
+        setNotices(data.items);
+        setTotalItems(data.totalCount || data.items.length);
+        return;
       }
+
+      // 서버 IP 차단 감지 시
+      if (data.isIpBlocked && data.directUrl) {
+        setIsIpRestricted(true);
+        // 등록된 IP(사용자의 로컬 브라우저)에서 직접 호출 시도
+        try {
+          const directRes = await fetch(data.directUrl, { mode: 'cors' });
+          const directText = await directRes.text();
+          if (directText.includes('<HIT')) {
+            const parsed = parseXmlResponse(directText, currentPage, itemsPerPage);
+            setNotices(parsed.items);
+            setTotalItems(parsed.totalCount);
+            setIsIpRestricted(false);
+            return;
+          }
+        } catch {
+          // 브라우저 CORS 제한 시 안내 메시지 유지
+        }
+      }
+
+      setNotices([]);
+      setTotalItems(0);
+      setApiMessage(data.message || '과제 데이터를 가져오지 못했습니다.');
+
     } catch (e) {
       console.error('Fetch error:', e);
       setNotices([]);
       setTotalItems(0);
-      setApiMessage('과제 데이터를 가져오지 못했습니다.');
+      setApiMessage('네트워크 통신 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
@@ -203,7 +284,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-900 pb-28">
-      {/* 글로벌 헤더 */}
+      {/* 1. 상단 헤더 */}
       <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-sm">
         <div className="max-w-6xl mx-auto px-6 h-18 py-3.5 flex items-center justify-between">
           <div 
@@ -237,7 +318,7 @@ export default function Home() {
 
       <main className="max-w-6xl mx-auto px-6 pt-8 space-y-6">
         {selectedNotice ? (
-          /* 상세 화면 */
+          /* ===================== 공고 상세 화면 ===================== */
           <div className="space-y-6 max-w-4xl mx-auto animate-in fade-in duration-200">
             <button
               onClick={() => setSelectedNotice(null)}
@@ -255,19 +336,12 @@ export default function Home() {
                   <span className="px-3.5 py-1.5 rounded-full text-sm font-bold bg-slate-100 text-slate-700">
                     {selectedNotice.noticeType}
                   </span>
-                  <span className={`px-3.5 py-1.5 rounded-full text-sm font-bold ${
-                    selectedNotice.status === '접수중' 
-                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
-                      : selectedNotice.status === '접수예정'
-                      ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                      : 'bg-slate-100 text-slate-600'
-                  }`}>
+                  <span className="px-3.5 py-1.5 rounded-full text-sm font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                     {selectedNotice.status}
                   </span>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {/* 해당 과제명으로 정확히 일치 검색되는 IRIS 직통 링크 */}
                   <a
                     href={selectedNotice.irisDirectUrl}
                     target="_blank"
@@ -278,7 +352,6 @@ export default function Home() {
                     IRIS 공고 검색 ▶
                   </a>
 
-                  {/* 매뉴얼 공식 규격의 NTIS 과제 상세 페이지 링크 */}
                   <a
                     href={selectedNotice.ntisUrl}
                     target="_blank"
@@ -289,9 +362,6 @@ export default function Home() {
                     NTIS 과제 상세 ▶
                   </a>
 
-                  <span className="text-sm font-bold text-rose-600 bg-rose-50 border border-rose-200 px-3.5 py-1.5 rounded-full whitespace-nowrap">
-                    {selectedNotice.dday}
-                  </span>
                   <button 
                     onClick={() => {
                       navigator.clipboard.writeText(window.location.href);
@@ -365,7 +435,7 @@ export default function Home() {
             </div>
           </div>
         ) : (
-          /* 메인 목록 화면 */
+          /* ===================== 메인 공고 목록 화면 ===================== */
           <div className="space-y-6">
             <div className="bg-white rounded-2xl border border-slate-200 p-7 shadow-sm space-y-6">
               {/* 1. 검색창 */}
@@ -475,7 +545,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* 통계 바: 부처 및 상태별 실제 건수 동적 반영 */}
+            {/* 통계 바 */}
             <div className="flex flex-wrap items-center justify-between gap-3 px-2">
               <span className="text-sm font-bold text-slate-600">
                 조회된 실제 과제공고 <strong className="text-slate-900 text-base">{totalItems.toLocaleString()}</strong>건
@@ -522,6 +592,17 @@ export default function Home() {
                 </button>
               </div>
             </div>
+
+            {/* IP 차단 발생 시 친절한 가이드 배너 */}
+            {isIpRestricted && (
+              <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3">
+                <ShieldAlert className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="text-xs text-amber-800 leading-relaxed">
+                  <strong>NTIS IP 보안 승인 안내:</strong> 발급받으신 인증키는 등록하신 IP(<code>1.217.108.124</code>)에서만 조회를 허용하도록 설정되어 있습니다. 
+                  해외 클라우드(Vercel) 서버 배포 환경에서도 7만 건 전량을 상시 조회하시려면, NTIS 마이페이지에서 <strong>등록 IP를 추가/변경</strong>하시거나 공공데이터포털 일반 인증키를 사용하시면 즉시 상시 연동됩니다.
+                </div>
+              </div>
+            )}
 
             {/* 공고 테이블 */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -591,13 +672,7 @@ export default function Home() {
                             className="py-4 px-3 text-center whitespace-nowrap"
                             onClick={() => setSelectedNotice(item)}
                           >
-                            <span className={`inline-block px-3 py-1 rounded-md text-xs font-bold whitespace-nowrap ${
-                              item.status === '접수중'
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                : item.status === '접수예정'
-                                ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                                : 'bg-slate-100 text-slate-500'
-                            }`}>
+                            <span className="inline-block px-3 py-1 rounded-md text-xs font-bold whitespace-nowrap bg-emerald-50 text-emerald-700 border border-emerald-200">
                               {item.status}
                             </span>
                           </td>
@@ -639,11 +714,7 @@ export default function Home() {
                             className="py-4 px-4 text-center whitespace-nowrap"
                             onClick={() => setSelectedNotice(item)}
                           >
-                            <span className={`inline-flex items-center justify-center min-w-[64px] font-bold text-xs sm:text-sm px-3 py-1 rounded-full whitespace-nowrap ${
-                              item.dday === '마감'
-                                ? 'text-slate-500 bg-slate-100 border border-slate-200'
-                                : 'text-rose-600 bg-rose-50 border border-rose-200'
-                            }`}>
+                            <span className="inline-flex items-center justify-center min-w-[64px] font-bold text-xs sm:text-sm px-3 py-1 rounded-full whitespace-nowrap text-slate-600 bg-slate-100 border border-slate-200">
                               {item.dday}
                             </span>
                           </td>
